@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>Sổ Giao Ca Trực Tuyến</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; }
+    .form-container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { font-weight: bold; display: block; margin-bottom: 5px; color: #333; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+    button { width: 100%; background-color: #1a73e8; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
+    button:hover { background-color: #1557b0; }
+    #result { margin-top: 15px; text-align: center; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <h2>SỔ GIAO CA TRỰC TUYẾN</h2>
+    <form id="handoverForm">
+      <div class="form-group">
+        <label>Ngày giao ca:</label>
+        <input type="date" id="ngayGiao" required>
+      </div>
+      <div class="form-group">
+        <label>Ca trực:</label>
+        <select id="caTruc" required>
+          <option value="Ca Sáng (06:00 - 14:00)">Ca Sáng (06:00 - 14:00)</option>
+          <option value="Ca Chiều (14:00 - 22:00)">Ca Chiều (14:00 - 22:00)</option>
+          <option value="Ca Đêm (22:00 - 06:00)">Ca Đêm (22:00 - 06:00)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Người giao ca:</label>
+        <input type="text" id="nguoiGiao" placeholder="Họ và tên người giao" required>
+      </div>
+      <div class="form-group">
+        <label>Người nhận ca:</label>
+        <input type="text" id="nguoiNhan" placeholder="Họ và tên người nhận" required>
+      </div>
+      <div class="form-group">
+        <label>Công việc đã hoàn thành:</label>
+        <textarea id="congViecDaXuLy" rows="3" placeholder="Ghi rõ các đầu việc đã xử lý trong ca..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Công việc tồn đọng / Bàn giao ca sau:</label>
+        <textarea id="congViecTonDong" rows="3" placeholder="Các công việc cần lưu ý hoặc xử lý tiếp..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Tình trạng thiết bị / Hệ thống:</label>
+        <textarea id="suCoThietBi" rows="2" placeholder="Tình trạng máy móc, công cụ..."></textarea>
+      </div>
+      <button type="button" onclick="submitForm()">TẠO & GỬI SỔ GIAO CA</button>
+    </form>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function submitForm() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang khởi tạo và đồng bộ sang Google Doc...</span>";
+
+      const formData = {
+        ngayGiao: document.getElementById('ngayGiao').value,
+        caTruc: document.getElementById('caTruc').value,
+        nguoiGiao: document.getElementById('nguoiGiao').value,
+        nguoiNhan: document.getElementById('nguoiNhan').value,
+        congViecDaXuLy: document.getElementById('congViecDaXuLy').value,
+        congViecTonDong: document.getElementById('congViecTonDong').value,
+        suCoThietBi: document.getElementById('suCoThietBi').value
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if(res.success) {
+            resultDiv.innerHTML = `<p style="color:green; font-weight:bold;">✅ Đã tạo thành công!</p>
+              <a href="${res.url}" target="_blank" style="color:#1a73e8; text-decoration:underline;">🔗 Mở file Google Doc Sổ Giao Ca vừa tạo</a>`;
+          } else {
+            resultDiv.innerHTML = `<p style="color:red;">❌ Có lỗi xảy ra: ${res.error || res.message}</p>`;
+          }
+        })
+        .withFailureHandler(function(err) {
+          resultDiv.innerHTML = `<p style="color:red;">❌ Lỗi hệ thống: ${err.message}</p>`;
+        })
+        .processHandover(formData);
+    }
+  </script>
+</body>
+</html>
