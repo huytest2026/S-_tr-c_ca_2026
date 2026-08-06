@@ -10,37 +10,134 @@ function doGet() {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function getGivenName(fullName) {
+  if (!fullName) return '';
+  const parts = fullName.toString().trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
+// Hàm đọc nội dung trực tiếp từ file Google Doc gần nhất
+function getContentFromLastDoc(docUrl) {
+  let content = {
+    congViecThuongXuyen: '',
+    noiDungCongViec: '',
+    noiDungTonTai: ''
+  };
+  
+  if (!docUrl || !docUrl.includes('http')) return content;
+
+  try {
+    const doc = DocumentApp.openByUrl(docUrl);
+    const text = doc.getBody().getText();
+
+    const idx21 = text.indexOf("2.1. Bảo dưỡng ngày");
+    const idx22 = text.indexOf("2.2. Tình hình thông tin");
+    const idx24 = text.indexOf("2.4. TỒN TẠI");
+    const idx3 = text.indexOf("3. XÁC NHẬN BÀN GIAO");
+
+    if (idx21 !== -1 && idx22 !== -1) {
+      content.congViecThuongXuyen = text.substring(idx21 + "2.1. Bảo dưỡng ngày".length, idx22).trim();
+    }
+    if (idx22 !== -1 && idx24 !== -1) {
+      content.noiDungCongViec = text.substring(idx22 + "2.2. Tình hình thông tin".length, idx24).trim();
+    }
+    if (idx24 !== -1 && idx3 !== -1) {
+      content.noiDungTonTai = text.substring(idx24 + "2.4. TỒN TẠI".length, idx3).trim();
+    }
+  } catch (e) {
+    Logger.log("Lỗi khi đọc nội dung Doc: " + e.toString());
+  }
+
+  return content;
+}
+
+// Lấy dữ liệu khởi tạo: Danh sách nhân viên + Nội dung từ file Google Doc ca trước
+function getInitialData() {
+  try {
+    const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    
+    // 1. Lấy danh sách nhân viên từ sheet "Danh sách nhân viên" (Sort theo Tên)
+    const staffSheet = ss.getSheetByName('Danh sách nhân viên') || ss.getSheets()[1];
+    let staffList = [];
+    const lastStaffRow = staffSheet.getLastRow();
+    if (lastStaffRow >= 2) {
+      const values = staffSheet.getRange(2, 2, lastStaffRow - 1, 1).getValues();
+      staffList = values
+        .map(row => row[0])
+        .filter(name => name && name.toString().trim() !== '')
+        .sort((a, b) => {
+          const strA = a.toString().trim();
+          const strB = b.toString().trim();
+          const compareGivenName = getGivenName(strA).localeCompare(getGivenName(strB), 'vi');
+          return compareGivenName !== 0 ? compareGivenName : strA.localeCompare(strB, 'vi');
+        });
+    }
+
+    // 2. Tìm link Google Doc gần nhất ở Sheet1
+    const logSheet = ss.getSheets()[0];
+    const lastLogRow = logSheet.getLastRow();
+    let lastHandover = {
+      congViecThuongXuyen: '',
+      noiDungCongViec: '',
+      noiDungTonTai: ''
+    };
+
+    if (lastLogRow >= 2) {
+      const rowValues = logSheet.getRange(lastLogRow, 1, 1, logSheet.getLastColumn()).getValues()[0];
+      // Tìm ô chứa đường link Google Doc trong dòng cuối cùng
+      const docUrl = rowValues.find(val => typeof val === 'string' && val.includes('docs.google.com/document'));
+      if (docUrl) {
+        lastHandover = getContentFromLastDoc(docUrl);
+      }
+    }
+
+    return {
+      success: true,
+      staffList: staffList,
+      lastHandover: lastHandover
+    };
+  } catch (err) {
+    Logger.log('Lỗi lấy dữ liệu khởi tạo: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+}
+
 function processHandover(formData) {
   try {
     const templateFile = DriveApp.getFileById(TEMPLATE_DOC_ID);
     const targetFolder = DriveApp.getFolderById(STORAGE_FOLDER_ID);
-    const fileName = `Sổ Giao Ca - ${formData.caTruc} - ${formData.ngayGiao}`;
+    const formattedDate = formatDate(formData.ngayGiao);
+    const fileName = `Sổ Giao Ca - ${formData.caTruc} - ${formattedDate}`;
     
-    // Nhân bản file mẫu
     const newFile = templateFile.makeCopy(fileName, targetFolder);
     const doc = DocumentApp.openById(newFile.getId());
     const body = doc.getBody();
     
-    // 1. THÔNG TIN CHUNG
-    body.replaceText('{{NGAY_GIAO}}', formData.ngayGiao || '');
+    body.replaceText('{{NGAY_GIAO}}', formattedDate);
     body.replaceText('{{CA_TRUC}}', formData.caTruc || '');
+    body.replaceText('{{CONG_VIEC_THUONG_XUYEN}}', formData.congViecThuongXuyen || 'Không có');
+    body.replaceText('{{NOI_DUNG_CONG_VIEC}}', formData.noiDungCongViec || 'Bình thường');
+    body.replaceText('{{NOI_DUNG_TON_TAI}}', formData.noiDungTonTai || 'Không có');
     body.replaceText('{{NGUOI_GIAO}}', formData.nguoiGiao || '');
-    body.replaceText('{{NGUOI_NHAN}}', formData.nguoiNhan || ''); // Tự động thay ở cả bảng thông tin và phần ký nhận
-    
-    // 2. NỘI DUNG BÀN GIAO CHI TIẾT
-    body.replaceText('{{CONG_VIEC_DA_XU_LY}}', 'Không có');
-    body.replaceText('{{CONG_VIEC_PHI_VO_TUYEN}}', formData.congViecDaXuLy || 'Không có');
-    body.replaceText('{{CONG_VIEC_VO_TUYEN}}', formData.suCoThietBi || 'Bình thường');
-    body.replaceText('{{TON_TAI}}', formData.congViecTonDong || 'Không có');
-    
-    // 3. XÁC NHẬN BÀN GIAO
-    body.replaceText('{{CHU_KY_DIGITAL}}', formData.nguoiGiao || '');
+    body.replaceText('{{NGUOI_NHAN}}', formData.nguoiNhan || '');
     
     doc.saveAndClose();
     
-    // Ghi nhật ký vào Google Sheet
-    const sheet = SpreadsheetApp.openById(LOG_SHEET_ID).getActiveSheet();
-    sheet.appendRow([new Date(), formData.ngayGiao, formData.caTruc, formData.nguoiGiao, formData.nguoiNhan, newFile.getUrl()]);
+    const sheet = SpreadsheetApp.openById(LOG_SHEET_ID).getSheets()[0];
+    sheet.appendRow([
+      new Date(), 
+      formattedDate, 
+      formData.caTruc, 
+      formData.nguoiGiao, 
+      formData.nguoiNhan, 
+      newFile.getUrl()
+    ]);
     
     return { success: true, url: newFile.getUrl() };
   } catch (err) {
