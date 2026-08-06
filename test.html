@@ -34,23 +34,27 @@
       </div>
       <div class="form-group">
         <label>Người giao ca:</label>
-        <input type="text" id="nguoiGiao" placeholder="Họ và tên người giao" required>
+        <select id="nguoiGiao" required>
+          <option value="">-- Đang tải danh sách... --</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Người nhận ca:</label>
-        <input type="text" id="nguoiNhan" placeholder="Họ và tên người nhận" required>
+        <select id="nguoiNhan" required>
+          <option value="">-- Đang tải danh sách... --</option>
+        </select>
       </div>
       <div class="form-group">
-        <label>Công việc đã hoàn thành:</label>
-        <textarea id="congViecDaXuLy" rows="3" placeholder="Ghi rõ các đầu việc đã xử lý trong ca..."></textarea>
+        <label>2.1. Bảo dưỡng ngày:</label>
+        <textarea id="congViecThuongXuyen" rows="3" placeholder="Nhập công việc bảo dưỡng ngày..."></textarea>
       </div>
       <div class="form-group">
-        <label>Công việc tồn đọng / Bàn giao ca sau:</label>
-        <textarea id="congViecTonDong" rows="3" placeholder="Các công việc cần lưu ý hoặc xử lý tiếp..."></textarea>
+        <label>2.2. Tình hình thông tin:</label>
+        <textarea id="noiDungCongViec" rows="3" placeholder="Ghi rõ tình hình thông tin trong ca..."></textarea>
       </div>
       <div class="form-group">
-        <label>Tình trạng thiết bị / Hệ thống:</label>
-        <textarea id="suCoThietBi" rows="2" placeholder="Tình trạng máy móc, công cụ..."></textarea>
+        <label>2.4. Tồn tại:</label>
+        <textarea id="noiDungTonTai" rows="2" placeholder="Nội dung tồn tại hoặc lưu ý cho ca sau..."></textarea>
       </div>
       <button type="button" onclick="submitForm()">TẠO & GỬI SỔ GIAO CA</button>
     </form>
@@ -58,8 +62,45 @@
   </div>
 
   <script>
+    // Tự động tải danh sách nhân viên & nội dung ca gần nhất khi mở trang
+    window.addEventListener('DOMContentLoaded', function() {
+      // Đặt ngày mặc định là hôm nay
+      document.getElementById('ngayGiao').valueAsDate = new Date();
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) {
+            // 1. Tải danh sách nhân viên
+            const nguoiGiao = document.getElementById('nguoiGiao');
+            const nguoiNhan = document.getElementById('nguoiNhan');
+            
+            nguoiGiao.innerHTML = '<option value="">-- Chọn người giao ca --</option>';
+            nguoiNhan.innerHTML = '<option value="">-- Chọn người nhận ca --</option>';
+            
+            res.staffList.forEach(function(name) {
+              nguoiGiao.add(new Option(name, name));
+              nguoiNhan.add(new Option(name, name));
+            });
+
+            // 2. Điền dữ liệu từ ca gần nhất vào 3 ô nội dung
+            if (res.lastHandover) {
+              document.getElementById('congViecThuongXuyen').value = res.lastHandover.congViecThuongXuyen || '';
+              document.getElementById('noiDungCongViec').value = res.lastHandover.noiDungCongViec || '';
+              document.getElementById('noiDungTonTai').value = res.lastHandover.noiDungTonTai || '';
+            }
+          }
+        })
+        .getInitialData();
+    });
+
     function submitForm() {
       const resultDiv = document.getElementById('result');
+      
+      if (!document.getElementById('nguoiGiao').value || !document.getElementById('nguoiNhan').value) {
+        alert('Vui lòng chọn đầy đủ Người giao ca và Người nhận ca!');
+        return;
+      }
+
       resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang khởi tạo và đồng bộ sang Google Doc...</span>";
 
       const formData = {
@@ -67,9 +108,9 @@
         caTruc: document.getElementById('caTruc').value,
         nguoiGiao: document.getElementById('nguoiGiao').value,
         nguoiNhan: document.getElementById('nguoiNhan').value,
-        congViecDaXuLy: document.getElementById('congViecDaXuLy').value,
-        congViecTonDong: document.getElementById('congViecTonDong').value,
-        suCoThietBi: document.getElementById('suCoThietBi').value
+        congViecThuongXuyen: document.getElementById('congViecThuongXuyen').value,
+        noiDungCongViec: document.getElementById('noiDungCongViec').value,
+        noiDungTonTai: document.getElementById('noiDungTonTai').value
       };
 
       google.script.run
