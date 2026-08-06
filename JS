@@ -1,0 +1,49 @@
+const TEMPLATE_DOC_ID = '1ekR7FCEMQemjjGlGVmV9dfbEhsE29Ih5Jizy9umkod0';
+const STORAGE_FOLDER_ID = '1piQfjhGZHkOtKDPtrmsIP1cq5Ksp9uJi';
+const LOG_SHEET_ID = '1MQ2trQbvKsoIOsq3q8FD9mOwkH21FS-G3aM3dw3DO08';
+
+function doGet() {
+  return HtmlService.createTemplateFromFile('test')
+      .evaluate()
+      .setTitle('Sổ Giao Ca Trực Tuyến')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function processHandover(formData) {
+  try {
+    const templateFile = DriveApp.getFileById(TEMPLATE_DOC_ID);
+    const targetFolder = DriveApp.getFolderById(STORAGE_FOLDER_ID);
+    const fileName = `Sổ Giao Ca - ${formData.caTruc} - ${formData.ngayGiao}`;
+    
+    // Nhân bản file mẫu
+    const newFile = templateFile.makeCopy(fileName, targetFolder);
+    const doc = DocumentApp.openById(newFile.getId());
+    const body = doc.getBody();
+    
+    // 1. THÔNG TIN CHUNG
+    body.replaceText('{{NGAY_GIAO}}', formData.ngayGiao || '');
+    body.replaceText('{{CA_TRUC}}', formData.caTruc || '');
+    body.replaceText('{{NGUOI_GIAO}}', formData.nguoiGiao || '');
+    body.replaceText('{{NGUOI_NHAN}}', formData.nguoiNhan || ''); // Tự động thay ở cả bảng thông tin và phần ký nhận
+    
+    // 2. NỘI DUNG BÀN GIAO CHI TIẾT
+    body.replaceText('{{CONG_VIEC_DA_XU_LY}}', 'Không có');
+    body.replaceText('{{CONG_VIEC_PHI_VO_TUYEN}}', formData.congViecDaXuLy || 'Không có');
+    body.replaceText('{{CONG_VIEC_VO_TUYEN}}', formData.suCoThietBi || 'Bình thường');
+    body.replaceText('{{TON_TAI}}', formData.congViecTonDong || 'Không có');
+    
+    // 3. XÁC NHẬN BÀN GIAO
+    body.replaceText('{{CHU_KY_DIGITAL}}', formData.nguoiGiao || '');
+    
+    doc.saveAndClose();
+    
+    // Ghi nhật ký vào Google Sheet
+    const sheet = SpreadsheetApp.openById(LOG_SHEET_ID).getActiveSheet();
+    sheet.appendRow([new Date(), formData.ngayGiao, formData.caTruc, formData.nguoiGiao, formData.nguoiNhan, newFile.getUrl()]);
+    
+    return { success: true, url: newFile.getUrl() };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
