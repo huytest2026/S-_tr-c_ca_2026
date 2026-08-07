@@ -251,14 +251,15 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
   }
 }
 
-// TÌM KIẾM SỐ HÓA CÁP QUANG TỪ GOOGLE SHEET (BỔ SUNG MỚI)
-function searchSoHoaCap(tramQLVal, tuyenCapVal, linkVal) {
+// TRA CỨU SỐ HÓA CÁP QUANG TỪ GOOGLE SHEET (TAB 3)
+function searchSoHoa(linkVal, tuyenCapVal, keywordVal) {
   try {
     const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
-    let sheet = ss.getSheetByName('Số hóa tuyến cáp') || ss.getSheetByName('Số hóa cáp quang');
+    // Đã sửa tên sheet đúng với thực tế: "Số hóa tuyến cáp"
+    const sheet = ss.getSheetByName('Số hóa tuyến cáp') || ss.getSheetByName('Số hóa cáp quang');
     
     if (!sheet) {
-      return { success: false, error: 'Không tìm thấy sheet "Số hóa tuyến cáp" hoặc "Số hóa cáp quang". Vui lòng kiểm tra lại tên sheet!' };
+      return { success: false, error: 'Không tìm thấy sheet "Số hóa tuyến cáp". Vui lòng kiểm tra lại tên sheet trong Google Sheet!' };
     }
     
     const lastRow = sheet.getLastRow();
@@ -266,28 +267,36 @@ function searchSoHoaCap(tramQLVal, tuyenCapVal, linkVal) {
       return { success: true, data: [] };
     }
 
-    const values = sheet.getRange(2, 1, lastRow - 1, 9).getDisplayValues();
+    // Đọc dữ liệu từ cột A (1) đến cột L (12)
+    const values = sheet.getRange(2, 1, lastRow - 1, Math.max(12, sheet.getLastColumn())).getDisplayValues();
     let results = [];
 
     values.forEach(row => {
-      const id = row[0] || '';
-      const tramQL = row[1] || '';
-      const tuyenCap = row[2] || '';
-      const link = row[3] || '';
-      const doiTuong = row[4] || '';
-      const otdr = row[5] || '';
-      const doSau = row[6] || '';
-      const taiKm = row[7] || '';
-      const toaDo = row[8] || '';
+      const id = row[0] || '';         // Cột A: ID
+      const tramQL = row[1] || '';     // Cột B: Trạm quản lý
+      const tuyenCap = row[2] || '';   // Cột C: Tuyến cáp
+      const link = row[3] || '';       // Cột D: Link
+      const doiTuong = row[4] || '';   // Cột E: Đối tượng định...
+      const otdr = row[5] || '';       // Cột F: OTDR -> MX
+      const doSau = row[6] || '';      // Cột G: Độ sâu
+      const taiKm = row[7] || '';      // Cột H: Tại Km
+      const toaDo = row[8] || '';      // Cột I: Lấy tọa độ
+      const thoiGian = row[9] || '';   // Cột J: Thời gian
+      const dienGiai = row[11] || '';  // Cột L: Diễn giải / Ghi chú
 
       let match = true;
-      if (tramQLVal && !tramQL.toLowerCase().includes(tramQLVal.toLowerCase().trim())) match = false;
-      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
       if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
+      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
+      
+      if (keywordVal) {
+        const kw = keywordVal.toLowerCase().trim();
+        const combinedText = `${doiTuong} ${taiKm} ${dienGiai} ${tramQL}`.toLowerCase();
+        if (!combinedText.includes(kw)) match = false;
+      }
 
       if (match) {
         results.push({
-          id, tramQL, tuyenCap, link, doiTuong, otdr, doSau, taiKm, toaDo
+          id, tramQL, tuyenCap, link, doiTuong, otdr, doSau, taiKm, toaDo, thoiGian, dienGiai
         });
       }
     });
