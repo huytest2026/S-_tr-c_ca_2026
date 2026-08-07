@@ -5,8 +5,8 @@ const LOG_SHEET_ID = '1MQ2trQbvKsoIOsq3q8FD9mOwkH21FS-G3aM3dw3DO08';
 function doGet() {
   return HtmlService.createTemplateFromFile('test')
       .evaluate()
-      .setTitle('Sổ Giao Ca Trực Tuyến')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setTitle('Hệ Thống Quản Lý Ca Trực & Sự Cố Cáp Quang')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -16,96 +16,144 @@ function getGivenName(fullName) {
   return parts[parts.length - 1];
 }
 
-// Hàm đọc nội dung trực tiếp từ file Google Doc gần nhất
-function getContentFromLastDoc(docUrl) {
-  let content = {
-    congViecThuongXuyen: '',
-    noiDungCongViec: '',
-    noiDungTonTai: ''
-  };
-  
-  if (!docUrl || !docUrl.includes('http')) return content;
+function getPdfUrlFromDocUrl(docUrl) {
+  if (!docUrl) return '';
+  const match = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return `https://docs.google.com/document/d/${match[1]}/export?format=pdf`;
+  }
+  return '';
+}
 
+function toCanonicalDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const str = val.toString().trim();
+  if (str.includes('-')) {
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+  }
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  return str;
+}
+
+function formatDate(dateStr) {
+  const canonical = toCanonicalDate(dateStr);
+  if (!canonical || !canonical.includes('-')) return dateStr;
+  const parts = canonical.split('-');
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function getContentFromLastDoc(docUrl) {
+  let content = { congViecThuongXuyen: '', noiDungCongViec: '', noiDungTonTai: '' };
+  if (!docUrl || !docUrl.includes('http')) return content;
   try {
     const doc = DocumentApp.openByUrl(docUrl);
     const text = doc.getBody().getText();
-
     const idx21 = text.indexOf("2.1. Bảo dưỡng ngày");
     const idx22 = text.indexOf("2.2. Tình hình thông tin");
     const idx24 = text.indexOf("2.4. TỒN TẠI");
     const idx3 = text.indexOf("3. XÁC NHẬN BÀN GIAO");
 
-    if (idx21 !== -1 && idx22 !== -1) {
-      content.congViecThuongXuyen = text.substring(idx21 + "2.1. Bảo dưỡng ngày".length, idx22).trim();
-    }
-    if (idx22 !== -1 && idx24 !== -1) {
-      content.noiDungCongViec = text.substring(idx22 + "2.2. Tình hình thông tin".length, idx24).trim();
-    }
-    if (idx24 !== -1 && idx3 !== -1) {
-      content.noiDungTonTai = text.substring(idx24 + "2.4. TỒN TẠI".length, idx3).trim();
-    }
+    if (idx21 !== -1 && idx22 !== -1) content.congViecThuongXuyen = text.substring(idx21 + "2.1. Bảo dưỡng ngày".length, idx22).trim();
+    if (idx22 !== -1 && idx24 !== -1) content.noiDungCongViec = text.substring(idx22 + "2.2. Tình hình thông tin".length, idx24).trim();
+    if (idx24 !== -1 && idx3 !== -1) content.noiDungTonTai = text.substring(idx24 + "2.4. TỒN TẠI".length, idx3).trim();
   } catch (e) {
-    Logger.log("Lỗi khi đọc nội dung Doc: " + e.toString());
+    Logger.log("Lỗi đọc Doc: " + e.toString());
   }
-
   return content;
 }
 
-// Lấy dữ liệu khởi tạo: Danh sách nhân viên + Nội dung từ file Google Doc ca trước
-function getInitialData() {
+function getShiftData(dateStr, caTruc) {
   try {
+    const targetCanonicalDate = toCanonicalDate(dateStr);
+    const targetCa = caTruc ? caTruc.toString().trim().toLowerCase() : '';
     const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    const sheet = ss.getSheets()[0];
+    const lastRow = sheet.getLastRow();
     
-    // 1. Lấy danh sách nhân viên từ sheet "Danh sách nhân viên" (Sort theo Tên)
-    const staffSheet = ss.getSheetByName('Danh sách nhân viên') || ss.getSheets()[1];
-    let staffList = [];
-    const lastStaffRow = staffSheet.getLastRow();
-    if (lastStaffRow >= 2) {
-      const values = staffSheet.getRange(2, 2, lastStaffRow - 1, 1).getValues();
-      staffList = values
-        .map(row => row[0])
-        .filter(name => name && name.toString().trim() !== '')
-        .sort((a, b) => {
-          const strA = a.toString().trim();
-          const strB = b.toString().trim();
-          const compareGivenName = getGivenName(strA).localeCompare(getGivenName(strB), 'vi');
-          return compareGivenName !== 0 ? compareGivenName : strA.localeCompare(strB, 'vi');
-        });
-    }
+    if (lastRow < 2) return { success: true, found: false, message: 'Chưa có dữ liệu nhật ký ca trực.' };
 
-    // 2. Tìm link Google Doc gần nhất ở Sheet1
-    const logSheet = ss.getSheets()[0];
-    const lastLogRow = logSheet.getLastRow();
-    let lastHandover = {
-      congViecThuongXuyen: '',
-      noiDungCongViec: '',
-      noiDungTonTai: ''
-    };
+    const displayValues = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
+    const rawValues = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
 
-    if (lastLogRow >= 2) {
-      const rowValues = logSheet.getRange(lastLogRow, 1, 1, logSheet.getLastColumn()).getValues()[0];
-      // Tìm ô chứa đường link Google Doc trong dòng cuối cùng
-      const docUrl = rowValues.find(val => typeof val === 'string' && val.includes('docs.google.com/document'));
-      if (docUrl) {
-        lastHandover = getContentFromLastDoc(docUrl);
+    for (let i = displayValues.length - 1; i >= 0; i--) {
+      const displayRow = displayValues[i];
+      const rawRow = rawValues[i];
+      const rowDateCanonical = toCanonicalDate(displayRow[1]) || toCanonicalDate(rawRow[1]);
+      const rowCa = displayRow[2] ? displayRow[2].toString().trim().toLowerCase() : '';
+
+      if (rowDateCanonical === targetCanonicalDate && rowCa === targetCa) {
+        const docUrl = rawRow.find(val => typeof val === 'string' && val.includes('docs.google.com/document')) ||
+                       displayRow.find(val => typeof val === 'string' && val.includes('docs.google.com/document'));
+        let content = docUrl ? getContentFromLastDoc(docUrl) : {
+          congViecThuongXuyen: displayRow[5] || '',
+          noiDungCongViec: displayRow[6] || '',
+          noiDungTonTai: displayRow[7] || ''
+        };
+
+        return {
+          success: true,
+          found: true,
+          data: {
+            nguoiGiao: displayRow[3] || rawRow[3] || '',
+            nguoiNhan: displayRow[4] || rawRow[4] || '',
+            congViecThuongXuyen: content.congViecThuongXuyen,
+            noiDungCongViec: content.noiDungCongViec,
+            noiDungTonTai: content.noiDungTonTai,
+            docUrl: docUrl || '',
+            pdfUrl: getPdfUrlFromDocUrl(docUrl)
+          }
+        };
       }
     }
-
-    return {
-      success: true,
-      staffList: staffList,
-      lastHandover: lastHandover
-    };
+    return { success: true, found: false, message: `Không tìm thấy dữ liệu của ${caTruc} ngày ${formatDate(dateStr)}.` };
   } catch (err) {
-    Logger.log('Lỗi lấy dữ liệu khởi tạo: ' + err.toString());
     return { success: false, error: err.toString() };
   }
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+function getInitialData() {
+  try {
+    const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    const staffSheet = ss.getSheetByName('Danh sách nhân viên') || ss.getSheets()[1];
+    let staffList = [];
+    const lastStaffRow = staffSheet.getLastRow();
+    
+    if (lastStaffRow >= 2) {
+      const values = staffSheet.getRange(2, 2, lastStaffRow - 1, 1).getValues();
+      staffList = values.map(row => row[0]).filter(name => name && name.toString().trim() !== '')
+        .sort((a, b) => getGivenName(a).localeCompare(getGivenName(b), 'vi'));
+    }
+
+    const logSheet = ss.getSheets()[0];
+    const lastLogRow = logSheet.getLastRow();
+    let lastHandover = { congViecThuongXuyen: '', noiDungCongViec: '', noiDungTonTai: '', pdfUrl: '' };
+
+    if (lastLogRow >= 2) {
+      const rowValues = logSheet.getRange(lastLogRow, 1, 1, logSheet.getLastColumn()).getValues()[0];
+      const docUrl = rowValues.find(val => typeof val === 'string' && val.includes('docs.google.com/document'));
+      if (docUrl) {
+        lastHandover = getContentFromLastDoc(docUrl);
+        lastHandover.pdfUrl = getPdfUrlFromDocUrl(docUrl);
+      }
+    }
+    return { success: true, staffList: staffList, lastHandover: lastHandover };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
 }
 
 function processHandover(formData) {
@@ -126,20 +174,125 @@ function processHandover(formData) {
     body.replaceText('{{NOI_DUNG_TON_TAI}}', formData.noiDungTonTai || 'Không có');
     body.replaceText('{{NGUOI_GIAO}}', formData.nguoiGiao || '');
     body.replaceText('{{NGUOI_NHAN}}', formData.nguoiNhan || '');
-    
     doc.saveAndClose();
     
-    const sheet = SpreadsheetApp.openById(LOG_SHEET_ID).getSheets()[0];
-    sheet.appendRow([
-      new Date(), 
-      formattedDate, 
-      formData.caTruc, 
-      formData.nguoiGiao, 
-      formData.nguoiNhan, 
-      newFile.getUrl()
-    ]);
+    const docUrl = newFile.getUrl();
+    const pdfUrl = getPdfUrlFromDocUrl(docUrl);
     
-    return { success: true, url: newFile.getUrl() };
+    const sheet = SpreadsheetApp.openById(LOG_SHEET_ID).getSheets()[0];
+    sheet.appendRow([new Date(), formattedDate, formData.caTruc, formData.nguoiGiao, formData.nguoiNhan, docUrl]);
+    
+    return { success: true, url: docUrl, pdfUrl: pdfUrl };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// TRA CỨU SỰ CỐ CÁP QUANG TỪ GOOGLE SHEET
+function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
+  try {
+    const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    const sheet = ss.getSheetByName('Sự cố cáp quang');
+    
+    if (!sheet) {
+      return { success: false, error: 'Không tìm thấy sheet "Sự cố cáp quang". Vui lòng kiểm tra lại tên sheet!' };
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, data: [] };
+    }
+
+    const values = sheet.getRange(2, 1, lastRow - 1, 11).getDisplayValues();
+    let results = [];
+    const searchOtdr = parseFloat(otdrVal);
+
+    values.forEach(row => {
+      const id = row[0];
+      const tramQL = row[1];
+      const tuyenCap = row[2];
+      const link = row[3];
+      const doiTuong = row[4];
+      const otdr = row[5];
+      const taiKm = row[6];
+      const toaDo = row[7];
+      const thoiGian = row[8];
+      const mxPs = row[9];
+      const mCapPs = row[10] || '';
+
+      let match = true;
+      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
+      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
+
+      if (match) {
+        let diff = 999999;
+        if (!isNaN(searchOtdr) && otdr) {
+          const numOtdr = parseFloat(otdr.toString().replace(',', '.'));
+          if (!isNaN(numOtdr)) diff = Math.abs(numOtdr - searchOtdr);
+        }
+        
+        results.push({
+          id, tramQL, tuyenCap, link, doiTuong, otdr, taiKm, toaDo, thoiGian, mxPs, mCapPs, diff
+        });
+      }
+    });
+
+    if (!isNaN(searchOtdr) && results.length > 0) {
+      results.sort((a, b) => a.diff - b.diff);
+    }
+
+    if (onlyNearest && results.length > 0) {
+      results = [results[0]];
+    }
+
+    return { success: true, data: results };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// TÌM KIẾM SỐ HÓA CÁP QUANG TỪ GOOGLE SHEET (BỔ SUNG MỚI)
+function searchSoHoaCap(tramQLVal, tuyenCapVal, linkVal) {
+  try {
+    const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    let sheet = ss.getSheetByName('Số hóa tuyến cáp') || ss.getSheetByName('Số hóa cáp quang');
+    
+    if (!sheet) {
+      return { success: false, error: 'Không tìm thấy sheet "Số hóa tuyến cáp" hoặc "Số hóa cáp quang". Vui lòng kiểm tra lại tên sheet!' };
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, data: [] };
+    }
+
+    const values = sheet.getRange(2, 1, lastRow - 1, 9).getDisplayValues();
+    let results = [];
+
+    values.forEach(row => {
+      const id = row[0] || '';
+      const tramQL = row[1] || '';
+      const tuyenCap = row[2] || '';
+      const link = row[3] || '';
+      const doiTuong = row[4] || '';
+      const otdr = row[5] || '';
+      const doSau = row[6] || '';
+      const taiKm = row[7] || '';
+      const toaDo = row[8] || '';
+
+      let match = true;
+      if (tramQLVal && !tramQL.toLowerCase().includes(tramQLVal.toLowerCase().trim())) match = false;
+      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
+      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
+
+      if (match) {
+        results.push({
+          id, tramQL, tuyenCap, link, doiTuong, otdr, doSau, taiKm, toaDo
+        });
+      }
+    });
+
+    return { success: true, data: results };
   } catch (err) {
     return { success: false, error: err.toString() };
   }
