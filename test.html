@@ -109,11 +109,15 @@
       <div class="form-row">
         <div class="form-group">
           <label>Tuyến (Link):</label>
-          <input type="text" id="scLink" placeholder="Ví dụ: HUE-ĐNG">
+          <select id="scLink">
+            <option value="">-- Tất cả Link --</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Loại cáp / Tuyến cáp:</label>
-          <input type="text" id="scTuyenCap" placeholder="Ví dụ: 96FO, 48FO">
+          <select id="scTuyenCap">
+            <option value="">-- Tất cả loại cáp --</option>
+          </select>
         </div>
       </div>
       <div class="form-group">
@@ -130,7 +134,6 @@
       <div id="mapBox" class="map-box" style="display: none;">
         <div class="map-header">
           <span>🗺️ BẢN ĐỒ VỊ TRÍ SỰ CỐ (<span id="markerCount">0</span> điểm có tọa độ)</span>
-          <small style="font-weight: normal; color: #666;">(Tự động vẽ đường dẫn OSRM)</small>
         </div>
         <div id="map"></div>
       </div>
@@ -145,11 +148,15 @@
       <div class="form-row">
         <div class="form-group">
           <label>Tuyến (Link):</label>
-          <input type="text" id="shLink" placeholder="Ví dụ: HUE-ĐNG">
+          <select id="shLink">
+            <option value="">-- Tất cả Link --</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Loại cáp / Tuyến cáp:</label>
-          <input type="text" id="shTuyenCap" placeholder="Ví dụ: 96FO">
+          <select id="shTuyenCap">
+            <option value="">-- Tất cả loại cáp --</option>
+          </select>
         </div>
       </div>
       <div class="form-group">
@@ -160,7 +167,6 @@
       <div id="shMapBox" class="map-box" style="display: none;">
         <div class="map-header" style="color: #27ae60;">
           <span>🗺️ BẢN ĐỒ SỐ HÓA CÁP QUANG (<span id="shMarkerCount">0</span> điểm có tọa độ)</span>
-          <small style="font-weight: normal; color: #666;">(Tự động vẽ tuyến cáp OSRM)</small>
         </div>
         <div id="shMap"></div>
       </div>
@@ -173,12 +179,10 @@
     var map = null;
     var markersGroup = null;
     var markerMap = {};
-    var suCoRouteLayer = null;
 
     var shMap = null;
     var shMarkersGroup = null;
     var shMarkerMap = {};
-    var shRouteLayer = null;
 
     function switchTab(evt, tabId) {
       var contents = document.querySelectorAll('.tab-content');
@@ -218,34 +222,6 @@
       }
     }
 
-    function drawOSRMRoute(coordsList, targetMap, isSoHoa) {
-      if (!coordsList || coordsList.length < 2) return;
-      var coordArr = [];
-      for (var i = 0; i < coordsList.length; i++) {
-        coordArr.push(coordsList[i].lng + ',' + coordsList[i].lat);
-      }
-      var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' + coordArr.join(';') + '?overview=full&geometries=geojson';
-
-      fetch(osrmUrl)
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-            var routeGeoJSON = data.routes[0].geometry;
-            var distanceKm = (data.routes[0].distance / 1000).toFixed(2);
-            if (isSoHoa) {
-              if (shRouteLayer) shMap.removeLayer(shRouteLayer);
-              shRouteLayer = L.geoJSON(routeGeoJSON, { style: { color: '#27ae60', weight: 4, opacity: 0.8, dashArray: '6, 6' } }).addTo(targetMap);
-              shRouteLayer.bindTooltip('Tuy\u1EBFn c\u00E1p OSRM: ~' + distanceKm + ' km', { sticky: true });
-            } else {
-              if (suCoRouteLayer) map.removeLayer(suCoRouteLayer);
-              suCoRouteLayer = L.geoJSON(routeGeoJSON, { style: { color: '#e74c3c', weight: 4, opacity: 0.8 } }).addTo(targetMap);
-              suCoRouteLayer.bindTooltip('\u0110\u01B0\u1EDDng di chuy\u1EC3n OSRM: ~' + distanceKm + ' km', { sticky: true });
-            }
-          }
-        })
-        .catch(function(err) { console.error("L\u1ED7i OSRM:", err); });
-    }
-
     function parseCoords(str) {
       if (!str) return null;
       var parts = str.toString().split(',');
@@ -279,13 +255,15 @@
 
     window.addEventListener('DOMContentLoaded', function() {
       document.getElementById('ngayGiao').valueAsDate = new Date();
+      
+      // Load dữ liệu khởi tạo gồm nhân viên, ca trực và danh sách dropdown Link/Tuyến cáp
       google.script.run
         .withSuccessHandler(function(res) {
           if (res.success) {
             var nguoiGiao = document.getElementById('nguoiGiao');
             var nguoiNhan = document.getElementById('nguoiNhan');
-            nguoiGiao.innerHTML = '<option value="">-- Ch\u00F3n ng\u01B0\u1EDDi giao ca --</option>';
-            nguoiNhan.innerHTML = '<option value="">-- Ch\u00F3n ng\u01B0\u1EDDi nh\u1EADn ca --</option>';
+            nguoiGiao.innerHTML = '<option value="">-- Chọn người giao ca --</option>';
+            nguoiNhan.innerHTML = '<option value="">-- Chọn người nhận ca --</option>';
             if (res.staffList && res.staffList.length > 0) {
               res.staffList.forEach(function(name) {
                 nguoiGiao.add(new Option(name, name));
@@ -298,10 +276,29 @@
               document.getElementById('noiDungTonTai').value = res.lastHandover.noiDungTonTai || '';
               if (res.lastHandover.pdfUrl) setPdfUrl(res.lastHandover.pdfUrl);
             }
+
+            // Đổ dữ liệu vào các thẻ select Link và Tuyến cáp nếu backend trả về
+            if (res.linkList) {
+              populateSelect('scLink', res.linkList, '-- Tất cả Link --');
+              populateSelect('shLink', res.linkList, '-- Tất cả Link --');
+            }
+            if (res.tuyenCapList) {
+              populateSelect('scTuyenCap', res.tuyenCapList, '-- Tất cả loại cáp --');
+              populateSelect('shTuyenCap', res.tuyenCapList, '-- Tất cả loại cáp --');
+            }
           }
         })
         .getInitialData();
     });
+
+    function populateSelect(elementId, items, defaultText) {
+      var selectElem = document.getElementById(elementId);
+      if (!selectElem) return;
+      selectElem.innerHTML = '<option value="">' + defaultText + '</option>';
+      items.forEach(function(item) {
+        if (item) selectElem.add(new Option(item, item));
+      });
+    }
 
     function setPdfUrl(url) {
       currentPdfUrl = url;
@@ -310,15 +307,15 @@
 
     function openPdf() {
       if (currentPdfUrl) window.open(currentPdfUrl, '_blank');
-      else alert('Kh\u00F4ng t\u00ECm th\u1EA5y \u0111\u01B0\u1EDDng d\u1EABn PDF c\u1EE7a ca tr\u1EF1c n\u00E0y!');
+      else alert('Không tìm thấy đường dẫn PDF của ca trực này!');
     }
 
     function loadShiftData() {
       var ngayGiao = document.getElementById('ngayGiao').value;
       var caTruc = document.getElementById('caTruc').value;
       var resultDiv = document.getElementById('result');
-      if (!ngayGiao) { alert('Vui l\u00F2ng ch\u1ECDn Ng\u00E0y giao ca!'); return; }
-      resultDiv.innerHTML = "<span style='color:blue;'>\u23F3 \u0110ang t\u00ECm ki\u1EBFm d\u1EF1 li\u1EC7u ca tr\u1EF1c...</span>";
+      if (!ngayGiao) { alert('Vui lòng chọn Ngày giao ca!'); return; }
+      resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang tìm kiếm...</span>";
 
       google.script.run
         .withSuccessHandler(function(res) {
@@ -329,10 +326,10 @@
             document.getElementById('noiDungCongViec').value = res.data.noiDungCongViec || '';
             document.getElementById('noiDungTonTai').value = res.data.noiDungTonTai || '';
             setPdfUrl(res.data.pdfUrl);
-            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">\u2705 \u0110\u00E3 t\u1EA3i d\u1EF1 li\u1EC7u th\u00E0nh c\u00F4ng!</p>';
+            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">✅ Đã tải dữ liệu thành công!</p>';
           } else {
             setPdfUrl('');
-            resultDiv.innerHTML = '<p style="color:#d93025; font-weight:bold;">\u26A0\uFE0F ' + (res.message || 'Kh\u00F4ng t\u00ECm th\u1EA5y d\u1EF1 li\u1EC7u') + '</p>';
+            resultDiv.innerHTML = '<p style="color:#d93025; font-weight:bold;">⚠️ ' + (res.message || 'Không tìm thấy dữ liệu') + '</p>';
           }
         })
         .getShiftData(ngayGiao, caTruc);
@@ -342,11 +339,9 @@
       var resultDiv = document.getElementById('result');
       var nguoiGiao = document.getElementById('nguoiGiao').value;
       var nguoiNhan = document.getElementById('nguoiNhan').value;
-      if (!nguoiGiao || !nguoiNhan) {
-        alert('Vui l\u00F2ng ch\u1ECDn \u0111\u1EA7y \u0111\u1EE7 Ng\u01B0\u1EDDi giao ca v\u00E0 Ng\u01B0\u1EDDi nh\u1EADn ca!');
-        return;
-      }
-      resultDiv.innerHTML = "<span style='color:blue;'>\u23F3 \u0110ang kh\u1EDFi t\u1EA1o v\u00E0 \u0111\u1ED3ng b\u1ED9...</span>";
+      if (!nguoiGiao || !nguoiNhan) { alert('Vui lòng chọn đầy đủ người!'); return; }
+      resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang khởi tạo...</span>";
+      
       var formData = {
         ngayGiao: document.getElementById('ngayGiao').value,
         caTruc: document.getElementById('caTruc').value,
@@ -361,9 +356,9 @@
         .withSuccessHandler(function(res) {
           if (res.success) {
             setPdfUrl(res.pdfUrl);
-            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">\u2705 \u0110\u00E3 t\u1EA1o s\u1ED5 giao ca th\u00E0nh c\u00F4ng!</p>';
+            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">✅ Đã tạo sổ giao ca thành công!</p>';
           } else {
-            resultDiv.innerHTML = '<p style="color:red;">\u274C C\u00F3 l\u1ED7i: ' + res.error + '</p>';
+            resultDiv.innerHTML = '<p style="color:red;">❌ Có lỗi: ' + res.error + '</p>';
           }
         })
         .processHandover(formData);
@@ -373,30 +368,28 @@
       var link = document.getElementById('scLink').value;
       var tuyenCap = document.getElementById('scTuyenCap').value;
       var otdr = document.getElementById('scOtdr').value;
-      var onlyNearest = document.getElementById('scOnlyNearest').checked;
       var sucoResult = document.getElementById('sucoResult');
       var mapBox = document.getElementById('mapBox');
 
-      sucoResult.innerHTML = "<span style='color:blue;'>\u23F3 \u0110ang tra c\u1EE9u d\u1EF1 li\u1EC7u s\u1EF1 c\u1ED1 c\u00E1p quang...</span>";
+      sucoResult.innerHTML = "<span style='color:blue;'>⏳ Đang tra cứu...</span>";
 
       google.script.run
         .withSuccessHandler(function(res) {
           if (res.success) {
             if (!res.data || res.data.length === 0) {
-              sucoResult.innerHTML = '<p style="color:red; font-weight:bold;">\u26A0\uFE0F Kh\u00F4ng t\u00ECm th\u1EA5y d\u1EF1 li\u1EC7u ph\u00F9 h\u1EE3p.</p>';
+              sucoResult.innerHTML = '<p style="color:red; font-weight:bold;">⚠️ Không tìm thấy dữ liệu.</p>';
               mapBox.style.display = 'none';
               return;
             }
 
             initMap();
             if (markersGroup) markersGroup.clearLayers();
-            if (suCoRouteLayer) map.removeLayer(suCoRouteLayer);
             markerMap = {};
             var validCoordsCount = 0;
-            var coordsList = [];
+            var firstCoord = null;
 
             var html = '<div class="table-responsive"><table><thead><tr>' +
-              '<th>Tuy\u1EBFn c\u00E1p</th><th>Link</th><th>\u0110\u1ED1i t\u01B0\u1EE3ng v\u1ECB tr\u00ED</th><th>OTDR->sc</th><th>T\u1EA1i Km</th><th>T\u1ECDA \u0111\u1ED9</th><th>Th\u1EDDi gian</th><th>MX PS</th><th>M c\u00E1p PS</th>' +
+              '<th>Tuyến</th><th>Đối tượng</th><th>OTDR</th><th>Tại Km</th><th>Tọa độ</th><th>Thời gian</th>' +
               '</tr></thead><tbody>';
 
             res.data.forEach(function(item) {
@@ -405,38 +398,15 @@
 
               if (coords) {
                 validCoordsCount++;
-                coordsList.push(coords);
-                var key = coords.lat + ',' + coords.lng;
-                var popupText = '<div style="font-size:13px; line-height:1.5;">' +
-                  '<b style="color:#1a73e8;">Tuy\u1EBFn: ' + (item.tuyenCap || '') + ' (' + (item.link || '') + ')</b><br>' +
-                  '<b>V\u1ECB tr\u00ED:</b> ' + (item.doiTuong || '') + '<br>' +
-                  '<b>OTDR->sc:</b> <span style="color:red; font-weight:bold;">' + (item.otdr || '') + '</span><br>' +
-                  '<b>T\u1EA1i Km:</b> ' + (item.taiKm || '') + '<br>' +
-                  '<b>Th\u1EDDi gian:</b> ' + (item.thoiGian || '') + '<br>' +
-                  '<b>T\u1ECDA \u0111\u1ED9:</b> ' + coords.lat + ', ' + coords.lng + '<br>' +
-                  '<a href="https://www.google.com/maps?q=' + coords.lat + ',' + coords.lng + '" target="_blank" style="color:#27ae60; font-weight:bold; text-decoration:none;">\uD83D\uDCCD Google Maps</a>' +
-                '</div>';
-
+                if (!firstCoord) firstCoord = coords;
                 var marker = L.marker([coords.lat, coords.lng]);
-                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', offset: [10, 0], className: 'map-red-label' });
-                marker.bindPopup(popupText);
+                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', className: 'map-red-label' });
                 markersGroup.addLayer(marker);
-                markerMap[key] = marker;
-
-                toaDoCell = '<span class="coord-link" onclick="focusMarker(' + coords.lat + ', ' + coords.lng + ')" title="Nh\u1EA5p \u0111\u1EC3 xem tr\u00EAn b\u1EA3n \u0111\u1ED3">\uD83D\uDCCD ' + item.toaDo + '</span>';
+                markerMap[coords.lat + ',' + coords.lng] = marker;
+                toaDoCell = '<span class="coord-link" onclick="focusMarker(' + coords.lat + ', ' + coords.lng + ')">📍 ' + item.toaDo + '</span>';
               }
 
-              html += '<tr>' +
-                '<td><b>' + (item.tuyenCap || '') + '</b></td>' +
-                '<td>' + (item.link || '') + '</td>' +
-                '<td>' + (item.doiTuong || '') + '</td>' +
-                '<td><b style="color:red;">' + (item.otdr || '') + '</b></td>' +
-                '<td>' + (item.taiKm || '') + '</td>' +
-                '<td>' + toaDoCell + '</td>' +
-                '<td>' + (item.thoiGian || '') + '</td>' +
-                '<td>' + (item.mxPs || '') + '</td>' +
-                '<td>' + (item.mCapPs || '') + '</td>' +
-              '</tr>';
+              html += '<tr><td><b>' + (item.tuyenCap || '') + '</b></td><td>' + (item.doiTuong || '') + '</td><td>' + (item.otdr || '') + '</td><td>' + (item.taiKm || '') + '</td><td>' + toaDoCell + '</td><td>' + (item.thoiGian || '') + '</td></tr>';
             });
 
             html += '</tbody></table></div>';
@@ -445,26 +415,18 @@
             if (validCoordsCount > 0 && map) {
               mapBox.style.display = 'block';
               document.getElementById('markerCount').innerText = validCoordsCount;
-              if (coordsList.length >= 2) drawOSRMRoute(coordsList, map, false);
               setTimeout(function() {
                 map.invalidateSize();
-                if (validCoordsCount === 1) {
-                  var layers = markersGroup.getLayers();
-                  map.setView(layers[0].getLatLng(), 14);
-                  layers[0].openPopup();
-                } else {
-                  map.fitBounds(markersGroup.getBounds().pad(0.2));
-                }
+                if (validCoordsCount === 1) map.setView([firstCoord.lat, firstCoord.lng], 14);
+                else map.fitBounds(markersGroup.getBounds().pad(0.2));
               }, 200);
-            } else {
-              mapBox.style.display = 'none';
-            }
+            } else { mapBox.style.display = 'none'; }
           } else {
-            sucoResult.innerHTML = '<p style="color:red;">\u274C L\u1ED7i: ' + res.error + '</p>';
+            sucoResult.innerHTML = '<p style="color:red;">❌ Lỗi: ' + res.error + '</p>';
             mapBox.style.display = 'none';
           }
         })
-        .searchSuCo(link, tuyenCap, otdr, onlyNearest);
+        .searchSuCo(link, tuyenCap, otdr, document.getElementById('scOnlyNearest').checked);
     }
 
     function doSearchSoHoa() {
@@ -474,26 +436,25 @@
       var sohoaResult = document.getElementById('sohoaResult');
       var shMapBox = document.getElementById('shMapBox');
 
-      sohoaResult.innerHTML = "<span style='color:blue;'>\u23F3 \u0110ang tra c\u1EE9u d\u1EF1 li\u1EC7u s\u1ED1 h\u00F3a c\u00E1p quang...</span>";
+      sohoaResult.innerHTML = "<span style='color:blue;'>⏳ Đang tra cứu...</span>";
 
       google.script.run
         .withSuccessHandler(function(res) {
           if (res.success) {
             if (!res.data || res.data.length === 0) {
-              sohoaResult.innerHTML = '<p style="color:red; font-weight:bold;">\u26A0\uFE0F Kh\u00F4ng t\u00ECm th\u1EA5y d\u1EF1 li\u1EC7u s\u1ED1 h\u00F3a ph\u00F9 h\u1EE3p.</p>';
+              sohoaResult.innerHTML = '<p style="color:red; font-weight:bold;">⚠️ Không tìm thấy dữ liệu.</p>';
               shMapBox.style.display = 'none';
               return;
             }
 
             initShMap();
             if (shMarkersGroup) shMarkersGroup.clearLayers();
-            if (shRouteLayer) shMap.removeLayer(shRouteLayer);
             shMarkerMap = {};
             var validCoordsCount = 0;
-            var shCoordsList = [];
+            var firstCoord = null;
 
             var html = '<div class="table-responsive"><table><thead><tr>' +
-              '<th class="th-sohoa">Tuy\u1EBFn c\u00E1p</th><th class="th-sohoa">Link</th><th class="th-sohoa">\u0110\u1ED1i t\u01B0\u1EE3ng v\u1ECB tr\u00ED</th><th class="th-sohoa">T\u1EA1i Km</th><th class="th-sohoa">T\u1ECDA \u0111\u1ED9</th><th class="th-sohoa">Dung l\u01B0\u1EE3ng</th><th class="th-sohoa">Hi\u1EC7n tr\u1EA1ng / Ghi ch\u00FA</th>' +
+              '<th class="th-sohoa">Tuyến</th><th class="th-sohoa">Đối tượng</th><th class="th-sohoa">Tại Km</th><th class="th-sohoa">Tọa độ</th><th class="th-sohoa">Ghi chú</th>' +
               '</tr></thead><tbody>';
 
             res.data.forEach(function(item) {
@@ -502,36 +463,15 @@
 
               if (coords) {
                 validCoordsCount++;
-                shCoordsList.push(coords);
-                var key = coords.lat + ',' + coords.lng;
-                var popupText = '<div style="font-size:13px; line-height:1.5;">' +
-                  '<b style="color:#27ae60;">\uD83C\uDF10 S\u1ED0 H\u00D3A: ' + (item.tuyenCap || '') + ' (' + (item.link || '') + ')</b><br>' +
-                  '<b>\u0110\u1ED1i t\u01B0\u1EE3ng:</b> ' + (item.doiTuong || '') + '<br>' +
-                  '<b>T\u1EA1i Km:</b> ' + (item.taiKm || '') + '<br>' +
-                  '<b>Dung l\u01B0\u1EE3ng:</b> ' + (item.dungLuong || '') + '<br>' +
-                  '<b>Ghi ch\u00FA:</b> ' + (item.ghiChu || '') + '<br>' +
-                  '<b>T\u1ECDA \u0111\u1ED9:</b> ' + coords.lat + ', ' + coords.lng + '<br>' +
-                  '<a href="https://www.google.com/maps?q=' + coords.lat + ',' + coords.lng + '" target="_blank" style="color:#27ae60; font-weight:bold; text-decoration:none;">\uD83D\uDCCD Google Maps</a>' +
-                '</div>';
-
+                if (!firstCoord) firstCoord = coords;
                 var marker = L.marker([coords.lat, coords.lng]);
-                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', offset: [10, 0], className: 'map-red-label' });
-                marker.bindPopup(popupText);
+                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', className: 'map-red-label' });
                 shMarkersGroup.addLayer(marker);
-                shMarkerMap[key] = marker;
-
-                toaDoCell = '<span class="coord-link" onclick="focusShMarker(' + coords.lat + ', ' + coords.lng + ')" title="Nh\u1EA5p \u0111\u1EC3 xem tr\u00EAn b\u1EA3n \u0111\u1ED3">\uD83D\uDCCD ' + item.toaDo + '</span>';
+                shMarkerMap[coords.lat + ',' + coords.lng] = marker;
+                toaDoCell = '<span class="coord-link" onclick="focusShMarker(' + coords.lat + ', ' + coords.lng + ')">📍 ' + item.toaDo + '</span>';
               }
 
-              html += '<tr>' +
-                '<td><b>' + (item.tuyenCap || '') + '</b></td>' +
-                '<td>' + (item.link || '') + '</td>' +
-                '<td>' + (item.doiTuong || '') + '</td>' +
-                '<td>' + (item.taiKm || '') + '</td>' +
-                '<td>' + toaDoCell + '</td>' +
-                '<td>' + (item.dungLuong || '') + '</td>' +
-                '<td>' + (item.ghiChu || '') + '</td>' +
-              '</tr>';
+              html += '<tr><td><b>' + (item.tuyenCap || '') + '</b></td><td>' + (item.doiTuong || '') + '</td><td>' + (item.taiKm || '') + '</td><td>' + toaDoCell + '</td><td>' + (item.ghiChu || '') + '</td></tr>';
             });
 
             html += '</tbody></table></div>';
@@ -540,22 +480,14 @@
             if (validCoordsCount > 0 && shMap) {
               shMapBox.style.display = 'block';
               document.getElementById('shMarkerCount').innerText = validCoordsCount;
-              if (shCoordsList.length >= 2) drawOSRMRoute(shCoordsList, shMap, true);
               setTimeout(function() {
                 shMap.invalidateSize();
-                if (validCoordsCount === 1) {
-                  var layers = shMarkersGroup.getLayers();
-                  shMap.setView(layers[0].getLatLng(), 14);
-                  layers[0].openPopup();
-                } else {
-                  shMap.fitBounds(shMarkersGroup.getBounds().pad(0.2));
-                }
+                if (validCoordsCount === 1) shMap.setView([firstCoord.lat, firstCoord.lng], 14);
+                else shMap.fitBounds(shMarkersGroup.getBounds().pad(0.2));
               }, 200);
-            } else {
-              shMapBox.style.display = 'none';
-            }
+            } else { shMapBox.style.display = 'none'; }
           } else {
-            sohoaResult.innerHTML = '<p style="color:red;">\u274C L\u1ED7i: ' + res.error + '</p>';
+            sohoaResult.innerHTML = '<p style="color:red;">❌ Lỗi: ' + res.error + '</p>';
             shMapBox.style.display = 'none';
           }
         })
