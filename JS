@@ -128,6 +128,7 @@ function getShiftData(dateStr, caTruc) {
 function getInitialData() {
   try {
     const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    
     const staffSheet = ss.getSheetByName('Danh sách nhân viên') || ss.getSheets()[1];
     let staffList = [];
     const lastStaffRow = staffSheet.getLastRow();
@@ -137,6 +138,64 @@ function getInitialData() {
       staffList = values.map(row => row[0]).filter(name => name && name.toString().trim() !== '')
         .sort((a, b) => getGivenName(a).localeCompare(getGivenName(b), 'vi'));
     }
+
+    const shSheet = ss.getSheetByName('Số hóa tuyến cáp') || ss.getSheetByName('Số hóa cáp quang');
+    let linkSet = {};
+    let tuyenCapSet = {};
+
+    if (shSheet) {
+      const shLastRow = shSheet.getLastRow();
+      if (shLastRow >= 2) {
+        const shValues = shSheet.getRange(2, 1, shLastRow - 1, Math.max(4, shSheet.getLastColumn())).getDisplayValues();
+        shValues.forEach(row => {
+          const tuyenCap = row[2] ? row[2].toString().trim() : '';
+          const link = row[3] ? row[3].toString().trim() : '';
+          if (tuyenCap) tuyenCapSet[tuyenCap] = true;
+          if (link) linkSet[link] = true;
+        });
+      }
+    }
+
+    const linkList = Object.keys(linkSet).sort();
+    const tuyenCapList = Object.keys(tuyenCapSet).sort();
+
+    const vtSheet = ss.getSheetByName('VẬT TƯ VT') || ss.getSheetByName('THEO DÕI VẬT TƯ');
+    let linhVucSet = {};
+    let allVatTuData = [];
+
+    if (vtSheet) {
+      const vtLastRow = vtSheet.getLastRow();
+      if (vtLastRow >= 2) {
+        const vtValues = vtSheet.getDataRange().getDisplayValues();
+        const headers = vtValues[0];
+        
+        let colMap = {};
+        for (let j = 0; j < headers.length; j++) {
+          colMap[headers[j].toString().trim().toUpperCase()] = j;
+        }
+
+        for (let i = 1; i < vtValues.length; i++) {
+          const row = vtValues[i];
+          const lv = colMap['LINHVUC'] !== undefined ? row[colMap['LINHVUC']].toString().trim() : '';
+          const tt = colMap['TENTAT'] !== undefined ? row[colMap['TENTAT']].toString().trim() : '';
+          
+          if (lv) linhVucSet[lv] = true;
+
+          allVatTuData.push({
+            maKho: colMap['MA_KHO'] !== undefined ? row[colMap['MA_KHO']] : (colMap['MALDAKHO'] !== undefined ? row[colMap['MALDAKHO']] : ''),
+            tenKho: colMap['TEN_KHO'] !== undefined ? row[colMap['TEN_KHO']] : (colMap['TENLDAKHO'] !== undefined ? row[colMap['TENLDAKHO']] : ''),
+            loHang: colMap['LOHANG'] !== undefined ? row[colMap['LOHANG']] : '',
+            maVt: colMap['MA_VT'] !== undefined ? row[colMap['MA_VT']] : '',
+            tenVt: colMap['TEN_VT'] !== undefined ? row[colMap['TEN_VT']] : (colMap['TENVT'] !== undefined ? row[colMap['TENVT']] : ''),
+            tenTat: tt,
+            partNumber: colMap['PART_NUMBER'] !== undefined ? row[colMap['PART_NUMBER']] : '',
+            serial: colMap['SERIAL'] !== undefined ? row[colMap['SERIAL']] : '',
+            linhVuc: lv
+          });
+        }
+      }
+    }
+    const linhVucList = Object.keys(linhVucSet).sort((a, b) => a.localeCompare(b, 'vi'));
 
     const logSheet = ss.getSheets()[0];
     const lastLogRow = logSheet.getLastRow();
@@ -150,7 +209,16 @@ function getInitialData() {
         lastHandover.pdfUrl = getPdfUrlFromDocUrl(docUrl);
       }
     }
-    return { success: true, staffList: staffList, lastHandover: lastHandover };
+
+    return { 
+      success: true, 
+      staffList: staffList, 
+      linkList: linkList, 
+      tuyenCapList: tuyenCapList, 
+      linhVucList: linhVucList,
+      allVatTuData: allVatTuData,
+      lastHandover: lastHandover 
+    };
   } catch (err) {
     return { success: false, error: err.toString() };
   }
@@ -188,20 +256,17 @@ function processHandover(formData) {
   }
 }
 
-// TRA CỨU SỰ CỐ CÁP QUANG TỪ GOOGLE SHEET
 function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
   try {
     const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
     const sheet = ss.getSheetByName('Sự cố cáp quang');
     
     if (!sheet) {
-      return { success: false, error: 'Không tìm thấy sheet "Sự cố cáp quang". Vui lòng kiểm tra lại tên sheet!' };
+      return { success: false, error: 'Không tìm thấy sheet "Sự cố cáp quang".' };
     }
     
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      return { success: true, data: [] };
-    }
+    if (lastRow < 2) return { success: true, data: [] };
 
     const values = sheet.getRange(2, 1, lastRow - 1, 11).getDisplayValues();
     let results = [];
@@ -210,8 +275,8 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
     values.forEach(row => {
       const id = row[0];
       const tramQL = row[1];
-      const tuyenCap = row[2];
-      const link = row[3];
+      const tuyenCap = row[2] ? row[2].toString().trim() : '';
+      const link = row[3] ? row[3].toString().trim() : '';
       const doiTuong = row[4];
       const otdr = row[5];
       const taiKm = row[6];
@@ -221,8 +286,8 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
       const mCapPs = row[10] || '';
 
       let match = true;
-      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
-      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
+      if (linkVal && linkVal.trim() !== "" && link !== linkVal.trim()) match = false;
+      if (tuyenCapVal && tuyenCapVal.trim() !== "" && tuyenCap !== tuyenCapVal.trim()) match = false;
 
       if (match) {
         let diff = 999999;
@@ -230,10 +295,7 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
           const numOtdr = parseFloat(otdr.toString().replace(',', '.'));
           if (!isNaN(numOtdr)) diff = Math.abs(numOtdr - searchOtdr);
         }
-        
-        results.push({
-          id, tramQL, tuyenCap, link, doiTuong, otdr, taiKm, toaDo, thoiGian, mxPs, mCapPs, diff
-        });
+        results.push({ id, tramQL, tuyenCap, link, doiTuong, otdr, taiKm, toaDo, thoiGian, mxPs, mCapPs, diff });
       }
     });
 
@@ -251,55 +313,104 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
   }
 }
 
-// TRA CỨU SỐ HÓA CÁP QUANG TỪ GOOGLE SHEET (TAB 3)
 function searchSoHoa(linkVal, tuyenCapVal, keywordVal) {
   try {
     const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
-    // Đã sửa tên sheet đúng với thực tế: "Số hóa tuyến cáp"
     const sheet = ss.getSheetByName('Số hóa tuyến cáp') || ss.getSheetByName('Số hóa cáp quang');
     
     if (!sheet) {
-      return { success: false, error: 'Không tìm thấy sheet "Số hóa tuyến cáp". Vui lòng kiểm tra lại tên sheet trong Google Sheet!' };
+      return { success: false, error: 'Không tìm thấy sheet "Số hóa tuyến cáp".' };
     }
     
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      return { success: true, data: [] };
-    }
+    if (lastRow < 2) return { success: true, data: [] };
 
-    // Đọc dữ liệu từ cột A (1) đến cột L (12)
     const values = sheet.getRange(2, 1, lastRow - 1, Math.max(12, sheet.getLastColumn())).getDisplayValues();
     let results = [];
 
     values.forEach(row => {
-      const id = row[0] || '';         // Cột A: ID
-      const tramQL = row[1] || '';     // Cột B: Trạm quản lý
-      const tuyenCap = row[2] || '';   // Cột C: Tuyến cáp
-      const link = row[3] || '';       // Cột D: Link
-      const doiTuong = row[4] || '';   // Cột E: Đối tượng định...
-      const otdr = row[5] || '';       // Cột F: OTDR -> MX
-      const doSau = row[6] || '';      // Cột G: Độ sâu
-      const taiKm = row[7] || '';      // Cột H: Tại Km
-      const toaDo = row[8] || '';      // Cột I: Lấy tọa độ
-      const thoiGian = row[9] || '';   // Cột J: Thời gian
-      const dienGiai = row[11] || '';  // Cột L: Diễn giải / Ghi chú
+      const id = row[0] || '';
+      const tramQL = row[1] || '';
+      const tuyenCap = row[2] ? row[2].toString().trim() : '';
+      const link = row[3] ? row[3].toString().trim() : '';
+      const doiTuong = row[4] || '';
+      const otdr = row[5] || '';
+      const doSau = row[6] || '';
+      const taiKm = row[7] || '';
+      const toaDo = row[8] || '';
+      const thoiGian = row[9] || '';
+      const dienGiai = row[11] || '';
 
       let match = true;
-      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
-      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
+      if (linkVal && linkVal.trim() !== "" && link !== linkVal.trim()) match = false;
+      if (tuyenCapVal && tuyenCapVal.trim() !== "" && tuyenCap !== tuyenCapVal.trim()) match = false;
       
-      if (keywordVal) {
+      if (keywordVal && keywordVal.trim() !== "") {
         const kw = keywordVal.toLowerCase().trim();
         const combinedText = `${doiTuong} ${taiKm} ${dienGiai} ${tramQL}`.toLowerCase();
         if (!combinedText.includes(kw)) match = false;
       }
 
       if (match) {
-        results.push({
-          id, tramQL, tuyenCap, link, doiTuong, otdr, doSau, taiKm, toaDo, thoiGian, dienGiai
-        });
+        results.push({ id, tramQL, tuyenCap, link, doiTuong, otdr, doSau, taiKm, toaDo, thoiGian, dienGiai });
       }
     });
+
+    return { success: true, data: results };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+function searchVatTu(linhVucVal, tentatVal) {
+  try {
+    const ss = SpreadsheetApp.openById(LOG_SHEET_ID);
+    const sheet = ss.getSheetByName('VẬT TƯ VT') || ss.getSheetByName('THEO DÕI VẬT TƯ');
+    
+    if (!sheet) {
+      return { success: false, error: 'Không tìm thấy sheet "VẬT TƯ VT".' };
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, data: [] };
+
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0];
+    
+    let colMap = {};
+    for (let j = 0; j < headers.length; j++) {
+      colMap[headers[j].toString().trim().toUpperCase()] = j;
+    }
+
+    let results = [];
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const linhVuc = colMap['LINHVUC'] !== undefined ? row[colMap['LINHVUC']].toString().trim() : '';
+      const tentat = colMap['TENTAT'] !== undefined ? row[colMap['TENTAT']].toString().trim() : '';
+
+      if (!linhVucVal || linhVuc !== linhVucVal.trim()) {
+        continue;
+      }
+
+      if (tentatVal && tentatVal.trim() !== '') {
+        const kw = tentatVal.toLowerCase().trim();
+        if (!tentat.toLowerCase().includes(kw)) {
+          continue;
+        }
+      }
+
+      results.push({
+        maKho: colMap['MA_KHO'] !== undefined ? row[colMap['MA_KHO']] : (colMap['MALDAKHO'] !== undefined ? row[colMap['MALDAKHO']] : ''),
+        tenKho: colMap['TEN_KHO'] !== undefined ? row[colMap['TEN_KHO']] : (colMap['TENLDAKHO'] !== undefined ? row[colMap['TENLDAKHO']] : ''),
+        loHang: colMap['LOHANG'] !== undefined ? row[colMap['LOHANG']] : '',
+        maVt: colMap['MA_VT'] !== undefined ? row[colMap['MA_VT']] : '',
+        tenVt: colMap['TEN_VT'] !== undefined ? row[colMap['TEN_VT']] : (colMap['TENVT'] !== undefined ? row[colMap['TENVT']] : ''),
+        tenTat: tentat,
+        partNumber: colMap['PART_NUMBER'] !== undefined ? row[colMap['PART_NUMBER']] : '',
+        serial: colMap['SERIAL'] !== undefined ? row[colMap['SERIAL']] : '',
+        linhVuc: linhVuc
+      });
+    }
 
     return { success: true, data: results };
   } catch (err) {
