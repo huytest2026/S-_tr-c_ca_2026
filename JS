@@ -275,8 +275,8 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
     values.forEach(row => {
       const id = row[0];
       const tramQL = row[1];
-      const tuyenCap = row[2] ? row[2].toString().trim() : '';
-      const link = row[3] ? row[3].toString().trim() : '';
+      const tuyenCap = row[2];
+      const link = row[3];
       const doiTuong = row[4];
       const otdr = row[5];
       const taiKm = row[6];
@@ -286,8 +286,8 @@ function searchSuCo(linkVal, tuyenCapVal, otdrVal, onlyNearest) {
       const mCapPs = row[10] || '';
 
       let match = true;
-      if (linkVal && linkVal.trim() !== "" && link !== linkVal.trim()) match = false;
-      if (tuyenCapVal && tuyenCapVal.trim() !== "" && tuyenCap !== tuyenCapVal.trim()) match = false;
+      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
+      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
 
       if (match) {
         let diff = 999999;
@@ -331,8 +331,8 @@ function searchSoHoa(linkVal, tuyenCapVal, keywordVal) {
     values.forEach(row => {
       const id = row[0] || '';
       const tramQL = row[1] || '';
-      const tuyenCap = row[2] ? row[2].toString().trim() : '';
-      const link = row[3] ? row[3].toString().trim() : '';
+      const tuyenCap = row[2] || '';
+      const link = row[3] || '';
       const doiTuong = row[4] || '';
       const otdr = row[5] || '';
       const doSau = row[6] || '';
@@ -342,10 +342,10 @@ function searchSoHoa(linkVal, tuyenCapVal, keywordVal) {
       const dienGiai = row[11] || '';
 
       let match = true;
-      if (linkVal && linkVal.trim() !== "" && link !== linkVal.trim()) match = false;
-      if (tuyenCapVal && tuyenCapVal.trim() !== "" && tuyenCap !== tuyenCapVal.trim()) match = false;
+      if (linkVal && !link.toLowerCase().includes(linkVal.toLowerCase().trim())) match = false;
+      if (tuyenCapVal && !tuyenCap.toLowerCase().includes(tuyenCapVal.toLowerCase().trim())) match = false;
       
-      if (keywordVal && keywordVal.trim() !== "") {
+      if (keywordVal) {
         const kw = keywordVal.toLowerCase().trim();
         const combinedText = `${doiTuong} ${taiKm} ${dienGiai} ${tramQL}`.toLowerCase();
         if (!combinedText.includes(kw)) match = false;
