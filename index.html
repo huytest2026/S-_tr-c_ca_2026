@@ -2,497 +2,554 @@
 <html>
 <head>
   <base target="_top">
-  <meta charset="UTF-8">
-  <title>Hệ Thống Sổ Giao Ca & Tra Cứu Sự Cố & Số Hóa Cáp Quang</title>
+  <meta charset="utf-8">
+  <title>Hệ Thống Quản Lý Ca Trực & Sự Cố Cáp Quang</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 10px; background-color: #f4f6f9; }
-    .main-container { max-width: 980px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    .tab-buttons { display: flex; border-bottom: 2px solid #1a73e8; margin-bottom: 20px; gap: 2px; }
-    .tab-btn { flex: 1; padding: 12px 8px; text-align: center; background: #e8f0fe; border: none; font-size: 14px; font-weight: bold; color: #1a73e8; cursor: pointer; transition: all 0.2s ease; border-top-left-radius: 6px; border-top-right-radius: 6px; }
-    .tab-btn.active { background: #1a73e8; color: #ffffff; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f6f9; color: #333; }
+    .container { max-width: 1250px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    
+    /* Tab Header styling */
+    .tab-header { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 25px; flex-wrap: wrap; gap: 5px; }
+    .tab-btn { padding: 12px 20px; cursor: pointer; background: #e9ecef; border: none; border-top-left-radius: 6px; border-top-right-radius: 6px; font-weight: bold; font-size: 14px; color: #495057; outline: none; transition: all 0.2s; }
+    .tab-btn.active { background: #1976d2; color: white; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-    .header-box h2 { margin: 0; color: #1a73e8; font-size: 20px; text-transform: uppercase; }
-    .btn-group-header { display: flex; gap: 8px; }
-    .btn-view { background-color: #ffffff; color: #d93025; border: 1px solid #d93025; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; }
-    .btn-view:hover { background-color: #d93025; color: #ffffff; }
-    .btn-print { background-color: #27ae60; color: #ffffff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; display: none; }
-    .form-group { margin-bottom: 15px; }
-    label { font-weight: bold; display: block; margin-bottom: 5px; color: #333; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
-    /* Cải tiến font chữ cho ô Tồn tại */
-    #noiDungTonTai { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #d32f2f; font-weight: bold; }
-    .form-row { display: flex; gap: 10px; }
-    .form-row .form-group { flex: 1; }
-    .btn-submit { width: 100%; background-color: #1a73e8; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-    .btn-submit:hover { background-color: #1557b0; }
-    .btn-search { background-color: #e67e22; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; font-weight: bold; width: 100%; }
-    .btn-search:hover { background-color: #d35400; }
-    .btn-search-sohoa { background-color: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; font-weight: bold; width: 100%; }
-    .btn-search-sohoa:hover { background-color: #1e8449; }
-    .map-box { margin-top: 20px; padding: 12px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; }
-    .map-header { font-weight: bold; color: #d35400; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
-    #map, #shMap { height: 380px; width: 100%; border-radius: 6px; border: 1px solid #ccc; z-index: 1; }
-    .map-red-label { background: transparent !important; border: none !important; box-shadow: none !important; color: red !important; font-weight: bold !important; font-size: 12px !important; white-space: nowrap !important; text-shadow: 1px 1px 2px white, -1px -1px 2px white; }
-    .table-responsive { overflow-x: auto; margin-top: 15px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background-color: #1a73e8; color: white; white-space: nowrap; }
-    .th-sohoa { background-color: #27ae60; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    .coord-link { color: #1a73e8; font-weight: bold; cursor: pointer; text-decoration: underline; }
-    .coord-link:hover { color: #d35400; }
-    #result, #sucoResult, #sohoaResult { margin-top: 15px; text-align: center; font-size: 15px; }
+    
+    .form-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 220px; }
+    label { display: block; margin-bottom: 6px; font-weight: bold; color: #333; font-size: 14px; }
+    input, select, textarea { width: 100%; padding: 10px 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background: #fff; }
+    input:focus, select:focus, textarea:focus { border-color: #1976d2; outline: none; box-shadow: 0 0 0 3px rgba(25,118,210,0.15); }
+    
+    /* CẢI TIẾN: Nút bấm lớn, nổi bật, dễ nhìn, màu sắc sinh động */
+    .btn-action { 
+      background: linear-gradient(135deg, #1976d2, #1565c0); 
+      color: white; 
+      padding: 12px 28px; 
+      border: none; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      font-size: 16px; 
+      box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3); 
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-action:hover { 
+      background: linear-gradient(135deg, #1565c0, #0d47a1); 
+      box-shadow: 0 6px 12px rgba(25, 118, 210, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn-success-action {
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
+      box-shadow: 0 4px 8px rgba(46, 125, 50, 0.3);
+    }
+    .btn-success-action:hover {
+      background: linear-gradient(135deg, #1b5e20, #103912);
+      box-shadow: 0 6px 12px rgba(46, 125, 50, 0.4);
+    }
+
+    .header-box { border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 8px; }
+    .table-responsive { overflow-x: auto; margin-top: 15px; border-radius: 6px; border: 1px solid #e0e0e0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    th, td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; }
+    th { background-color: #f8f9fa; color: #333; font-weight: bold; }
+    tr:nth-child(even) { background-color: #fbfbfb; }
+    .loading { color: #1976d2; font-style: italic; font-weight: bold; padding: 10px 0; }
+    .map-link { color: #1976d2; text-decoration: underline; cursor: pointer; font-weight: bold; }
+    
+    #mapSoHoaContainer { margin-top: 25px; display: none; }
+    #mapSoHoa { height: 480px; width: 100%; border-radius: 6px; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .map-label-tag { background: transparent !important; border: none !important; box-shadow: none !important; font-size: 13px; font-weight: bold; color: #d32f2f !important; white-space: nowrap; text-shadow: 1px 1px 2px #fff, -1px -1px 2px #fff, 1px -1px 2px #fff, -1px 1px 2px #fff; }
+    
+    .checkbox-group { display: flex; align-items: center; gap: 10px; margin: 15px 0; background: #f8f9fa; padding: 12px 15px; border-radius: 6px; border: 1px solid #e9ecef; }
+    .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+    .checkbox-group label { margin-bottom: 0; cursor: pointer; font-weight: normal; font-size: 14px; }
   </style>
 </head>
 <body>
-  <div class="main-container">
-    <div class="tab-buttons">
-      <button type="button" class="tab-btn active" onclick="switchTab(event, 'tabGiaoCa')">📋 SỔ GIAO CA TRỰC</button>
-      <button type="button" class="tab-btn" onclick="switchTab(event, 'tabSuCo')">⚡ TRA CỨU SỰ CỐ CÁP QUANG</button>
-      <button type="button" class="tab-btn" onclick="switchTab(event, 'tabSoHoa')">🌐 SỐ HÓA CÁP QUANG</button>
+  <div class="container">
+    <div class="tab-header">
+      <button class="tab-btn active" onclick="openTab(event, 'tabGiaoCa')">📊 SỔ GIAO CA TRỰC</button>
+      <button class="tab-btn" onclick="openTab(event, 'tabSuCo')">⚡ TRA CỨU SỰ CỐ</button>
+      <button class="tab-btn" onclick="openTab(event, 'tabSoHoa')">🌐 SỔ HÓA CÁP QUANG</button>
+      <button class="tab-btn" onclick="openTab(event, 'tabVatTu')">📦 THEO DÕI VẬT TƯ</button>
     </div>
 
-    <!-- TAB 1 -->
+    <!-- TAB 1: SỔ GIAO CA TRỰC -->
     <div id="tabGiaoCa" class="tab-content active">
       <div class="header-box">
-        <h2>Sổ Giao Ca Trực Tuyến</h2>
-        <div class="btn-group-header">
-          <button type="button" class="btn-view" onclick="loadShiftData()">🔍 xem ca trước</button>
-          <button type="button" id="btnPrintPdf" class="btn-print" onclick="openPdf()">🖨️ In PDF ca này</button>
-        </div>
+        <h2 style="color: #1976d2; margin: 0;">NHẬT KÝ & BÀN GIAO CA TRỰC</h2>
       </div>
-      <form id="handoverForm">
+      <div class="form-row">
         <div class="form-group">
           <label>Ngày giao ca:</label>
-          <input type="date" id="ngayGiao" required>
+          <input type="date" id="gcNgayGiao">
         </div>
         <div class="form-group">
           <label>Ca trực:</label>
-          <select id="caTruc" required>
-            <option value="Ca Sáng (06:00 - 14:00)">Ca Sáng (06:00 - 14:00)</option>
-            <option value="Ca Chiều (14:00 - 22:00)">Ca Chiều (14:00 - 22:00)</option>
-            <option value="Ca Đêm (22:00 - 06:00)">Ca Đêm (22:00 - 06:00)</option>
+          <select id="gcCaTruc">
+            <option value="Ca 1">Ca 1 (07:00 - 15:00)</option>
+            <option value="Ca 2">Ca 2 (15:00 - 23:00)</option>
+            <option value="Ca 3">Ca 3 (23:00 - 07:00)</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Người giao ca:</label>
-          <select id="nguoiGiao"><option value="">-- Chọn người giao ca --</option></select>
+      </div>
+      <button type="button" class="btn-action" onclick="loadShiftData()">📥 Tải Dữ Liệu Ca Trực</button>
+
+      <form id="handoverForm" style="margin-top: 20px;" onsubmit="submitHandover(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Người giao:</label>
+            <select id="gcNguoiGiao" required></select>
+          </div>
+          <div class="form-group">
+            <label>Người nhận:</label>
+            <select id="gcNguoiNhan" required></select>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Người nhận ca:</label>
-          <select id="nguoiNhan"><option value="">-- Chọn người nhận ca --</option></select>
+        <div class="form-group" style="margin-bottom: 15px;">
+          <label>2.1. Công việc thường xuyên / Bảo dưỡng:</label>
+          <textarea id="gcCongViecTX" rows="3"></textarea>
         </div>
-        <div class="form-group">
-          <label>2.1. Bảo dưỡng ngày:</label>
-          <textarea id="congViecThuongXuyen" rows="6" placeholder="Nhập công việc bảo dưỡng ngày..."></textarea>
+        <div class="form-group" style="margin-bottom: 15px;">
+          <label>2.2. Tình hình thông tin & sự cố:</label>
+          <textarea id="gcNoiDungCV" rows="3"></textarea>
         </div>
-        <div class="form-group">
-          <label>2.2. Tình hình thông tin:</label>
-          <textarea id="noiDungCongViec" rows="6" placeholder="Ghi rõ tình hình thông tin trong ca..."></textarea>
+        <div class="form-group" style="margin-bottom: 15px;">
+          <label>2.4. Tồn tại cần xử lý:</label>
+          <textarea id="gcTonTai" rows="3"></textarea>
         </div>
-        <div class="form-group">
-          <label>2.4. Tồn tại:</label>
-          <textarea id="noiDungTonTai" rows="6" placeholder="STT | Vị trí | Lỗi | Loại cáp"></textarea>
-        </div>
-        <button type="button" class="btn-submit" onclick="submitForm()">TẠO & GỬI SỔ GIAO CA</button>
+        <button type="submit" class="btn-action btn-success-action">💾 Lưu & Tạo Biên Bản Bàn Giao</button>
       </form>
-      <div id="result"></div>
+      <div id="handoverResult" style="margin-top: 15px;"></div>
     </div>
 
-    <!-- TAB 2 -->
+    <!-- TAB 2: TRA CỨU SỰ CỐ -->
     <div id="tabSuCo" class="tab-content">
       <div class="header-box">
-        <h2 style="color: #e67e22;">THEO DÕI & TRA CỨU SỰ CỐ CÁP QUANG</h2>
+        <h2 style="color: #d32f2f; margin: 0;">TRA CỨU SỰ CỐ CÁP QUANG</h2>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Tuyến (Link):</label>
-          <select id="scLink">
-            <option value="">-- Tất cả Link --</option>
-          </select>
+          <label>Link:</label>
+          <select id="scLink"><option value="">-- Tất cả Link --</option></select>
         </div>
         <div class="form-group">
-          <label>Loại cáp / Tuyến cáp:</label>
-          <select id="scTuyenCap">
-            <option value="">-- Tất cả loại cáp --</option>
-          </select>
+          <label>Tuyến cáp:</label>
+          <select id="scTuyenCap"><option value="">-- Tất cả Tuyến cáp --</option></select>
+        </div>
+        <div class="form-group">
+          <label>Khoảng cách đo OTDR (km):</label>
+          <input type="text" id="scOtdr" placeholder="Ví dụ: 12.345">
         </div>
       </div>
-      <div class="form-group">
-        <label>Khoảng cách đo OTDR Fault (km):</label>
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <input type="number" step="0.01" id="scOtdr" placeholder="Nhập số Km đo được, VD: 51.08" style="flex: 1; min-width: 200px;">
-          <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; margin: 0; white-space: nowrap; color: #d35400;">
-            <input type="checkbox" id="scOnlyNearest" style="width: auto; cursor: pointer;">
-            <b>Chỉ lấy điểm gần nhất</b>
-          </label>
-        </div>
+
+      <!-- CẢI TIẾN: Thêm diễn giải rõ ràng cho Checkbox theo yêu cầu hình 3 -->
+      <div class="checkbox-group">
+        <input type="checkbox" id="scOnlyNearest" checked>
+        <label for="scOnlyNearest">
+          <b>Chỉ hiển thị điểm sự cố gần nhất khớp với thông số OTDR</b> 
+          <span style="color: #d32f2f; font-weight: bold; margin-left: 5px;">(Tìm điểm gần nhất)</span>
+        </label>
       </div>
-      <button type="button" class="btn-search" onclick="doSearchSuCo()">🔍 TRA CỨU SỰ CỐ</button>
-      <div id="mapBox" class="map-box" style="display: none;">
-        <div class="map-header">
-          <span>🗺️ BẢN ĐỒ VỊ TRÍ SỰ CỐ (<span id="markerCount">0</span> điểm có tọa độ)</span>
-        </div>
-        <div id="map"></div>
-      </div>
-      <div id="sucoResult"></div>
+
+      <!-- CẢI TIẾN: Nút Tra cứu sự cố nổi bật, rõ ràng, dễ nhìn -->
+      <button type="button" class="btn-action" onclick="doSearchSuCo()">🔍 TRA CỨU SỰ CỐ</button>
+      <div id="suCoResult" style="margin-top: 15px;"></div>
     </div>
 
-    <!-- TAB 3 -->
+    <!-- TAB 3: SỔ HÓA CÁP QUANG -->
     <div id="tabSoHoa" class="tab-content">
       <div class="header-box">
-        <h2 style="color: #27ae60;">QUẢN LÝ & TRA CỨU SỐ HÓA CÁP QUANG</h2>
+        <h2 style="color: #2e7d32; margin: 0;">TRA CỨU DỮ LIỆU SỔ HÓA CÁP QUANG</h2>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Tuyến (Link):</label>
-          <select id="shLink">
-            <option value="">-- Tất cả Link --</option>
+          <label>Link:</label>
+          <select id="shLink"><option value="">-- Tất cả Link --</option></select>
+        </div>
+        <div class="form-group">
+          <label>Tuyến cáp:</label>
+          <select id="shTuyenCap"><option value="">-- Tất cả Tuyến cáp --</option></select>
+        </div>
+        <div class="form-group">
+          <label>Từ khóa tìm kiếm (Đối tượng, Tại Km, Ghi chú...):</label>
+          <input type="text" id="shKeyword" placeholder="Nhập từ khóa cần tìm...">
+        </div>
+      </div>
+      
+      <!-- CẢI TIẾN: Nút Tra cứu số hóa được làm sáng, to rõ, bắt mắt -->
+      <button type="button" class="btn-action btn-success-action" onclick="doSearchSoHoa()">🔍 TRA CỨU SỔ HÓA</button>
+
+      <div id="mapSoHoaContainer">
+        <h3 id="mapSoHoaTitle" style="color: #2e7d32; margin-bottom: 8px;">📖 BẢN ĐỒ SỐ HÓA CÁP QUANG</h3>
+        <div id="mapSoHoa"></div>
+      </div>
+
+      <div id="soHoaResult"></div>
+    </div>
+
+    <!-- TAB 4: THEO DÕI VẬT TƯ -->
+    <div id="tabVatTu" class="tab-content">
+      <div class="header-box">
+        <h2 style="color: #e65100; margin: 0;">TRA CỨU VẬT TƯ VẬN HÀNH</h2>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Lĩnh vực:</label>
+          <select id="vtLinhVuc" onchange="filterVatTuByLinhVuc()">
+            <option value="">-- Tất cả Lĩnh vực --</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Loại cáp / Tuyến cáp:</label>
-          <select id="shTuyenCap">
-            <option value="">-- Tất cả loại cáp --</option>
-          </select>
+          <label>Tên tắt / Tên vật tư:</label>
+          <input type="text" id="vtKeyword" placeholder="Nhập tên vật tư cần tìm..." oninput="doSearchVatTuLocal()">
         </div>
       </div>
-      <div class="form-group">
-        <label>Từ khóa tra cứu (Măng xông, Cột, Km, Vị trí...):</label>
-        <input type="text" id="shKeyword" placeholder="Nhập tên Măng xông, số Cột hoặc vị trí Km...">
-      </div>
-      <button type="button" class="btn-search-sohoa" onclick="doSearchSoHoa()">🔍 TRA CỨU SỐ HÓA CÁP</button>
-      <div id="shMapBox" class="map-box" style="display: none;">
-        <div class="map-header" style="color: #27ae60;">
-          <span>🗺️ BẢN ĐỒ SỐ HÓA CÁP QUANG (<span id="shMarkerCount">0</span> điểm có tọa độ)</span>
-        </div>
-        <div id="shMap"></div>
-      </div>
-      <div id="sohoaResult"></div>
+      <button type="button" class="btn-action" style="background: linear-gradient(135deg, #ef6c00, #e65100);" onclick="doSearchVatTuLocal()">🔍 TRA CỨU VẬT TƯ</button>
+      <div id="vatTuResult" style="margin-top: 15px;"></div>
     </div>
   </div>
 
   <script>
-    // ... (Giữ nguyên toàn bộ phần Script bạn đã gửi)
-    var currentPdfUrl = '';
-    var map = null;
-    var markersGroup = null;
-    var markerMap = {};
+    var globalVatTuData = [];
+    var mapInstanceSoHoa = null;
+    var markersLayerSoHoa = null;
 
-    var shMap = null;
-    var shMarkersGroup = null;
-    var shMarkerMap = {};
-
-    function switchTab(evt, tabId) {
-      var contents = document.querySelectorAll('.tab-content');
-      var buttons = document.querySelectorAll('.tab-btn');
-      for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
-      for (var j = 0; j < buttons.length; j++) buttons[j].classList.remove('active');
-
-      if (evt && evt.currentTarget) evt.currentTarget.classList.add('active');
-      var targetTab = document.getElementById(tabId);
-      if (targetTab) targetTab.classList.add('active');
-
-      setTimeout(function() {
-        if (tabId === 'tabSuCo' && map) map.invalidateSize();
-        if (tabId === 'tabSoHoa' && shMap) shMap.invalidateSize();
-      }, 150);
-    }
-
-    function initMap() {
-      if (!map && typeof L !== 'undefined') {
-        map = L.map('map').setView([16.4637, 107.5909], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(map);
-        markersGroup = L.featureGroup().addTo(map);
+    function openTab(evt, tabName) {
+      var tabcontent = document.getElementsByClassName("tab-content");
+      for (var i = 0; i < tabcontent.length; i++) tabcontent[i].classList.remove("active");
+      var tablinks = document.getElementsByClassName("tab-btn");
+      for (var i = 0; i < tablinks.length; i++) tablinks[i].classList.remove("active");
+      document.getElementById(tabName).classList.add("active");
+      evt.currentTarget.classList.add("active");
+      if (mapInstanceSoHoa && tabName === 'tabSoHoa') {
+        setTimeout(function() { mapInstanceSoHoa.invalidateSize(); }, 200);
       }
     }
 
-    function initShMap() {
-      if (!shMap && typeof L !== 'undefined') {
-        shMap = L.map('shMap').setView([16.4637, 107.5909], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(shMap);
-        shMarkersGroup = L.featureGroup().addTo(shMap);
-      }
-    }
-
-    function parseCoords(str) {
-      if (!str) return null;
-      var parts = str.toString().split(',');
-      if (parts.length === 2) {
-        var lat = parseFloat(parts[0].trim());
-        var lng = parseFloat(parts[1].trim());
-        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          return { lat: lat, lng: lng };
-        }
-      }
-      return null;
-    }
-
-    function focusMarker(lat, lng) {
-      if (map) {
-        document.getElementById('mapBox').scrollIntoView({ behavior: 'smooth' });
-        map.setView([lat, lng], 15);
-        var key = lat + ',' + lng;
-        if (markerMap[key]) markerMap[key].openPopup();
-      }
-    }
-
-    function focusShMarker(lat, lng) {
-      if (shMap) {
-        document.getElementById('shMapBox').scrollIntoView({ behavior: 'smooth' });
-        shMap.setView([lat, lng], 15);
-        var key = lat + ',' + lng;
-        if (shMarkerMap[key]) shMarkerMap[key].openPopup();
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('ngayGiao').valueAsDate = new Date();
-      
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) {
-            var nguoiGiao = document.getElementById('nguoiGiao');
-            var nguoiNhan = document.getElementById('nguoiNhan');
-            nguoiGiao.innerHTML = '<option value="">-- Chọn người giao ca --</option>';
-            nguoiNhan.innerHTML = '<option value="">-- Chọn người nhận ca --</option>';
-            if (res.staffList && res.staffList.length > 0) {
-              res.staffList.forEach(function(name) {
-                nguoiGiao.add(new Option(name, name));
-                nguoiNhan.add(new Option(name, name));
-              });
-            }
-            if (res.lastHandover) {
-              document.getElementById('congViecThuongXuyen').value = res.lastHandover.congViecThuongXuyen || '';
-              document.getElementById('noiDungCongViec').value = res.lastHandover.noiDungCongViec || '';
-              document.getElementById('noiDungTonTai').value = res.lastHandover.noiDungTonTai || '';
-              if (res.lastHandover.pdfUrl) setPdfUrl(res.lastHandover.pdfUrl);
-            }
-
-            if (res.linkList) {
-              populateSelect('scLink', res.linkList, '-- Tất cả Link --');
-              populateSelect('shLink', res.linkList, '-- Tất cả Link --');
-            }
-            if (res.tuyenCapList) {
-              populateSelect('scTuyenCap', res.tuyenCapList, '-- Tất cả loại cáp --');
-              populateSelect('shTuyenCap', res.tuyenCapList, '-- Tất cả loại cáp --');
-            }
-          }
-        })
-        .getInitialData();
-    });
-
-    function populateSelect(elementId, items, defaultText) {
-      var selectElem = document.getElementById(elementId);
-      if (!selectElem) return;
-      selectElem.innerHTML = '<option value="">' + defaultText + '</option>';
-      items.forEach(function(item) {
-        if (item) selectElem.add(new Option(item, item));
+    function populateSelect(selectId, list, defaultText) {
+      var select = document.getElementById(selectId);
+      select.innerHTML = '<option value="">' + defaultText + '</option>';
+      list.forEach(function(item) {
+        var opt = document.createElement('option');
+        opt.value = item;
+        opt.textContent = item;
+        select.appendChild(opt);
       });
     }
 
-    function setPdfUrl(url) {
-      currentPdfUrl = url;
-      document.getElementById('btnPrintPdf').style.display = url ? 'inline-block' : 'none';
+    function formatToaDoCell(toaDoStr) {
+      if (!toaDoStr || !toaDoStr.toString().trim()) return '';
+      var cleanStr = toaDoStr.toString().trim();
+      if (cleanStr.includes(',')) {
+        var parts = cleanStr.split(',');
+        if (parts.length >= 2) {
+          var lat = parts[0].trim();
+          var lng = parts[1].trim();
+          if (!isNaN(lat) && !isNaN(lng)) {
+            var mapUrl = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+            return '<a href="' + mapUrl + '" target="_blank" class="map-link" title="Xem trên Google Maps">' + cleanStr + ' 🗺️</a>';
+          }
+        }
+      }
+      return cleanStr;
     }
 
-    function openPdf() {
-      if (currentPdfUrl) window.open(currentPdfUrl, '_blank');
-      else alert('Không tìm thấy đường dẫn PDF của ca trực này!');
-    }
+    window.onload = function() {
+      var today = new Date().toISOString().split('T')[0];
+      document.getElementById('gcNgayGiao').value = today;
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          if (res.staffList) {
+            populateSelect('gcNguoiGiao', res.staffList, '-- Chọn người giao --');
+            populateSelect('gcNguoiNhan', res.staffList, '-- Chọn người nhận --');
+          }
+          if (res.linkList) {
+            populateSelect('scLink', res.linkList, '-- Tất cả Link --');
+            populateSelect('shLink', res.linkList, '-- Tất cả Link --');
+          }
+          if (res.tuyenCapList) {
+            populateSelect('scTuyenCap', res.tuyenCapList, '-- Tất cả Tuyến cáp --');
+            populateSelect('shTuyenCap', res.tuyenCapList, '-- Tất cả Tuyến cáp --');
+          }
+          if (res.linhVucList) {
+            populateSelect('vtLinhVuc', res.linhVucList, '-- Tất cả Lĩnh vực --');
+          }
+          if (res.allVatTuData) {
+            globalVatTuData = res.allVatTuData;
+            renderVatTuTable(globalVatTuData);
+          }
+          if (res.lastHandover) {
+            document.getElementById('gcCongViecTX').value = res.lastHandover.congViecThuongXuyen || '';
+            document.getElementById('gcNoiDungCV').value = res.lastHandover.noiDungCongViec || '';
+            document.getElementById('gcTonTai').value = res.lastHandover.noiDungTonTai || '';
+          }
+        } else {
+          alert("Lỗi khởi tạo dữ liệu: " + res.error);
+        }
+      }).getInitialData();
+    };
 
     function loadShiftData() {
-      var ngayGiao = document.getElementById('ngayGiao').value;
-      var caTruc = document.getElementById('caTruc').value;
-      var resultDiv = document.getElementById('result');
-      if (!ngayGiao) { alert('Vui lòng chọn Ngày giao ca!'); return; }
-      resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang tìm kiếm...</span>";
-
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success && res.found) {
-            if (res.data.nguoiGiao) document.getElementById('nguoiGiao').value = res.data.nguoiGiao;
-            if (res.data.nguoiNhan) document.getElementById('nguoiNhan').value = res.data.nguoiNhan;
-            document.getElementById('congViecThuongXuyen').value = res.data.congViecThuongXuyen || '';
-            document.getElementById('noiDungCongViec').value = res.data.noiDungCongViec || '';
-            document.getElementById('noiDungTonTai').value = res.data.noiDungTonTai || '';
-            setPdfUrl(res.data.pdfUrl);
-            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">✅ Đã tải dữ liệu thành công!</p>';
+      var ngayGiao = document.getElementById('gcNgayGiao').value;
+      var caTruc = document.getElementById('gcCaTruc').value;
+      if (!ngayGiao) {
+        alert("Vui lòng chọn ngày giao ca!");
+        return;
+      }
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          if (res.found && res.data) {
+            document.getElementById('gcNguoiGiao').value = res.data.nguoiGiao;
+            document.getElementById('gcNguoiNhan').value = res.data.nguoiNhan;
+            document.getElementById('gcCongViecTX').value = res.data.congViecThuongXuyen;
+            document.getElementById('gcNoiDungCV').value = res.data.noiDungCongViec;
+            document.getElementById('gcTonTai').value = res.data.noiDungTonTai;
+            document.getElementById('handoverResult').innerHTML = '<p style="color: green; font-weight: bold;">✅ Đã tải thành công dữ liệu ca trực cũ.</p>';
           } else {
-            setPdfUrl('');
-            resultDiv.innerHTML = '<p style="color:#d93025; font-weight:bold;">⚠️ ' + (res.message || 'Không tìm thấy dữ liệu') + '</p>';
+            document.getElementById('handoverResult').innerHTML = '<p style="color: orange; font-weight: bold;">⚠️ ' + res.message + '</p>';
           }
-        })
-        .getShiftData(ngayGiao, caTruc);
+        } else {
+          alert("Lỗi: " + res.error);
+        }
+      }).getShiftData(ngayGiao, caTruc);
     }
 
-    function submitForm() {
-      var resultDiv = document.getElementById('result');
-      var nguoiGiao = document.getElementById('nguoiGiao').value;
-      var nguoiNhan = document.getElementById('nguoiNhan').value;
-      if (!nguoiGiao || !nguoiNhan) { alert('Vui lòng chọn đầy đủ người!'); return; }
-      resultDiv.innerHTML = "<span style='color:blue;'>⏳ Đang khởi tạo...</span>";
-      
+    function submitHandover(e) {
+      e.preventDefault();
       var formData = {
-        ngayGiao: document.getElementById('ngayGiao').value,
-        caTruc: document.getElementById('caTruc').value,
-        nguoiGiao: nguoiGiao,
-        nguoiNhan: nguoiNhan,
-        congViecThuongXuyen: document.getElementById('congViecThuongXuyen').value,
-        noiDungCongViec: document.getElementById('noiDungCongViec').value,
-        noiDungTonTai: document.getElementById('noiDungTonTai').value
+        ngayGiao: document.getElementById('gcNgayGiao').value,
+        caTruc: document.getElementById('gcCaTruc').value,
+        nguoiGiao: document.getElementById('gcNguoiGiao').value,
+        nguoiNhan: document.getElementById('gcNguoiNhan').value,
+        congViecThuongXuyen: document.getElementById('gcCongViecTX').value,
+        noiDungCongViec: document.getElementById('gcNoiDungCV').value,
+        noiDungTonTai: document.getElementById('gcTonTai').value
       };
+      
+      document.getElementById('handoverResult').innerHTML = '<p class="loading">⏳ Đang tạo biên bản bàn giao ca trực...</p>';
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) {
-            setPdfUrl(res.pdfUrl);
-            resultDiv.innerHTML = '<p style="color:green; font-weight:bold;">✅ Đã tạo sổ giao ca thành công!</p>';
-          } else {
-            resultDiv.innerHTML = '<p style="color:red;">❌ Có lỗi: ' + res.error + '</p>';
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          var html = '<p style="color: green; font-weight: bold;">🎉 Tạo biên bản bàn giao thành công!</p>';
+          html += '<p><a href="' + res.url + '" target="_blank" class="map-link">📄 Xem Google Doc Biên Bản</a> | ';
+          if (res.pdfUrl) {
+            html += '<a href="' + res.pdfUrl + '" target="_blank" class="map-link">📥 Tải File PDF</a></p>';
           }
-        })
-        .processHandover(formData);
+          html += '</p>';
+          document.getElementById('handoverResult').innerHTML = html;
+        } else {
+          document.getElementById('handoverResult').innerHTML = '<p style="color: red; font-weight: bold;">❌ Lỗi: ' + res.error + '</p>';
+        }
+      }).processHandover(formData);
     }
 
     function doSearchSuCo() {
       var link = document.getElementById('scLink').value;
       var tuyenCap = document.getElementById('scTuyenCap').value;
       var otdr = document.getElementById('scOtdr').value;
-      var sucoResult = document.getElementById('sucoResult');
-      var mapBox = document.getElementById('mapBox');
+      var onlyNearest = document.getElementById('scOnlyNearest').checked;
+      var resultDiv = document.getElementById('suCoResult');
 
-      sucoResult.innerHTML = "<span style='color:blue;'>⏳ Đang tra cứu...</span>";
+      resultDiv.innerHTML = '<p class="loading">⏳ Đang tra cứu sự cố...</p>';
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) {
-            if (!res.data || res.data.length === 0) {
-              sucoResult.innerHTML = '<p style="color:red; font-weight:bold;">⚠️ Không tìm thấy dữ liệu.</p>';
-              mapBox.style.display = 'none';
-              return;
-            }
-
-            initMap();
-            if (markersGroup) markersGroup.clearLayers();
-            markerMap = {};
-            var validCoordsCount = 0;
-            var firstCoord = null;
-
-            var html = '<div class="table-responsive"><table><thead><tr>' +
-              '<th>Tuyến</th><th>Đối tượng</th><th>OTDR</th><th>Tại Km</th><th>Tọa độ</th><th>Thời gian</th>' +
-              '</tr></thead><tbody>';
-
-            res.data.forEach(function(item) {
-              var coords = parseCoords(item.toaDo);
-              var toaDoCell = item.toaDo || '';
-
-              if (coords) {
-                validCoordsCount++;
-                if (!firstCoord) firstCoord = coords;
-                var marker = L.marker([coords.lat, coords.lng]);
-                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', className: 'map-red-label' });
-                markersGroup.addLayer(marker);
-                markerMap[coords.lat + ',' + coords.lng] = marker;
-                toaDoCell = '<span class="coord-link" onclick="focusMarker(' + coords.lat + ', ' + coords.lng + ')">📍 ' + item.toaDo + '</span>';
-              }
-
-              html += '<tr><td><b>' + (item.tuyenCap || '') + '</b></td><td>' + (item.doiTuong || '') + '</td><td>' + (item.otdr || '') + '</td><td>' + (item.taiKm || '') + '</td><td>' + toaDoCell + '</td><td>' + (item.thoiGian || '') + '</td></tr>';
-            });
-
-            html += '</tbody></table></div>';
-            sucoResult.innerHTML = html;
-
-            if (validCoordsCount > 0 && map) {
-              mapBox.style.display = 'block';
-              document.getElementById('markerCount').innerText = validCoordsCount;
-              setTimeout(function() {
-                map.invalidateSize();
-                if (validCoordsCount === 1) map.setView([firstCoord.lat, firstCoord.lng], 14);
-                else map.fitBounds(markersGroup.getBounds().pad(0.2));
-              }, 200);
-            } else { mapBox.style.display = 'none'; }
-          } else {
-            sucoResult.innerHTML = '<p style="color:red;">❌ Lỗi: ' + res.error + '</p>';
-            mapBox.style.display = 'none';
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          if (!res.data || res.data.length === 0) {
+            resultDiv.innerHTML = '<p style="color: red; font-weight: bold;">⚠️ Không tìm thấy điểm sự cố phù hợp.</p>';
+            return;
           }
-        })
-        .searchSuCo(link, tuyenCap, otdr, document.getElementById('scOnlyNearest').checked);
+
+          var html = '<div class="table-responsive"><table><thead><tr>' +
+            '<th>ID</th><th>Trạm QL</th><th>Tuyến Cáp</th><th>Link</th><th>Đối Tượng</th><th>OTDR</th>' +
+            '<th>Tại Km</th><th>Tọa Độ</th><th>Thời Gian</th><th>Mức Phụ Sóng (MX)</th><th>Mức Phụ Cáp</th>' +
+            '</tr></thead><tbody>';
+
+          res.data.forEach(function(row) {
+            html += '<tr>' +
+              '<td>' + (row.id || '') + '</td>' +
+              '<td>' + (row.tramQL || '') + '</td>' +
+              '<td>' + (row.tuyenCap || '') + '</td>' +
+              '<td>' + (row.link || '') + '</td>' +
+              '<td>' + (row.doiTuong || '') + '</td>' +
+              '<td>' + (row.otdr || '') + '</td>' +
+              '<td>' + (row.taiKm || '') + '</td>' +
+              '<td>' + formatToaDoCell(row.toaDo) + '</td>' +
+              '<td>' + (row.thoiGian || '') + '</td>' +
+              '<td>' + (row.mxPs || '') + '</td>' +
+              '<td>' + (row.mCapPs || '') + '</td>' +
+              '</tr>';
+          });
+
+          html += '</tbody></table></div>';
+          resultDiv.innerHTML = html;
+        } else {
+          resultDiv.innerHTML = '<p style="color: red;">❌ Lỗi: ' + res.error + '</p>';
+        }
+      }).searchSuCo(link, tuyenCap, otdr, onlyNearest);
     }
 
     function doSearchSoHoa() {
       var link = document.getElementById('shLink').value;
       var tuyenCap = document.getElementById('shTuyenCap').value;
       var keyword = document.getElementById('shKeyword').value;
-      var sohoaResult = document.getElementById('sohoaResult');
-      var shMapBox = document.getElementById('shMapBox');
+      var resultDiv = document.getElementById('soHoaResult');
+      var mapContainer = document.getElementById('mapSoHoaContainer');
 
-      sohoaResult.innerHTML = "<span style='color:blue;'>⏳ Đang tra cứu...</span>";
+      resultDiv.innerHTML = '<p class="loading">⏳ Đang tra cứu dữ liệu số hóa...</p>';
+      mapContainer.style.display = 'none';
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) {
-            if (!res.data || res.data.length === 0) {
-              sohoaResult.innerHTML = '<p style="color:red; font-weight:bold;">⚠️ Không tìm thấy dữ liệu.</p>';
-              shMapBox.style.display = 'none';
-              return;
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          if (!res.data || res.data.length === 0) {
+            resultDiv.innerHTML = '<p style="color: red; font-weight: bold;">⚠️ Không tìm thấy dữ liệu số hóa phù hợp.</p>';
+            return;
+          }
+
+          var html = '<div class="table-responsive"><table><thead><tr>' +
+            '<th>ID</th><th>Trạm QL</th><th>Tuyến Cáp</th><th>Link</th><th>Đối Tượng</th><th>OTDR</th>' +
+            '<th>Độ Sâu</th><th>Tại Km</th><th>Tọa Độ</th><th>Thời Gian</th><th>Diễn Giải</th>' +
+            '</tr></thead><tbody>';
+
+          var validCoords = [];
+
+          res.data.forEach(function(row) {
+            html += '<tr>' +
+              '<td>' + (row.id || '') + '</td>' +
+              '<td>' + (row.tramQL || '') + '</td>' +
+              '<td>' + (row.tuyenCap || '') + '</td>' +
+              '<td>' + (row.link || '') + '</td>' +
+              '<td>' + (row.doiTuong || '') + '</td>' +
+              '<td>' + (row.otdr || '') + '</td>' +
+              '<td>' + (row.doSau || '') + '</td>' +
+              '<td>' + (row.taiKm || '') + '</td>' +
+              '<td>' + formatToaDoCell(row.toaDo) + '</td>' +
+              '<td>' + (row.thoiGian || '') + '</td>' +
+              '<td>' + (row.dienGiai || '') + '</td>' +
+              '</tr>';
+
+            if (row.toaDo && row.toaDo.toString().trim() !== '') {
+              var cleanToaDo = row.toaDo.toString().trim();
+              if (cleanToaDo.includes(',')) {
+                var parts = cleanToaDo.split(',');
+                if (parts.length >= 2) {
+                  var lat = parseFloat(parts[0].trim());
+                  var lng = parseFloat(parts[1].trim());
+                  if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
+                    validCoords.push({ lat: lat, lng: lng, info: row });
+                  }
+                }
+              }
             }
+          });
 
-            initShMap();
-            if (shMarkersGroup) shMarkersGroup.clearLayers();
-            shMarkerMap = {};
-            var validCoordsCount = 0;
-            var firstCoord = null;
+          html += '</tbody></table></div>';
+          resultDiv.innerHTML = html;
 
-            var html = '<div class="table-responsive"><table><thead><tr>' +
-              '<th class="th-sohoa">Tuyến</th><th class="th-sohoa">Đối tượng</th><th class="th-sohoa">Tại Km</th><th class="th-sohoa">Tọa độ</th><th class="th-sohoa">Ghi chú</th>' +
-              '</tr></thead><tbody>';
+          if (validCoords.length > 0) {
+            mapContainer.style.display = 'block';
+            document.getElementById('mapSoHoaTitle').textContent = `📖 BẢN ĐỒ SỐ HÓA CÁP QUANG (${validCoords.length} điểm có tọa độ)`;
 
-            res.data.forEach(function(item) {
-              var coords = parseCoords(item.toaDo);
-              var toaDoCell = item.toaDo || '';
-
-              if (coords) {
-                validCoordsCount++;
-                if (!firstCoord) firstCoord = coords;
-                var marker = L.marker([coords.lat, coords.lng]);
-                marker.bindTooltip((item.doiTuong || '') + '/' + (item.taiKm || ''), { permanent: true, direction: 'right', className: 'map-red-label' });
-                shMarkersGroup.addLayer(marker);
-                shMarkerMap[coords.lat + ',' + coords.lng] = marker;
-                toaDoCell = '<span class="coord-link" onclick="focusShMarker(' + coords.lat + ', ' + coords.lng + ')">📍 ' + item.toaDo + '</span>';
+            setTimeout(function() {
+              if (!mapInstanceSoHoa) {
+                mapInstanceSoHoa = L.map('mapSoHoa').setView([validCoords[0].lat, validCoords[0].lng], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  maxZoom: 19,
+                  attribution: '© OpenStreetMap contributors'
+                }).addTo(mapInstanceSoHoa);
+              } else {
+                mapInstanceSoHoa.invalidateSize();
               }
 
-              html += '<tr><td><b>' + (item.tuyenCap || '') + '</b></td><td>' + (item.doiTuong || '') + '</td><td>' + (item.taiKm || '') + '</td><td>' + toaDoCell + '</td><td>' + (item.ghiChu || '') + '</td></tr>';
-            });
+              if (markersLayerSoHoa) {
+                mapInstanceSoHoa.removeLayer(markersLayerSoHoa);
+              }
+              markersLayerSoHoa = L.layerGroup().addTo(mapInstanceSoHoa);
 
-            html += '</tbody></table></div>';
-            sohoaResult.innerHTML = html;
+              var bounds = [];
+              validCoords.forEach(function(item) {
+                var marker = L.marker([item.lat, item.lng]).addTo(markersLayerSoHoa);
+                var doiTuong = item.info.doiTuong || 'MX';
+                var taiKm = item.info.taiKm || '';
+                var labelText = doiTuong + '/' + (taiKm.toLowerCase().startsWith('km') ? taiKm : 'Km ' + taiKm);
 
-            if (validCoordsCount > 0 && shMap) {
-              shMapBox.style.display = 'block';
-              document.getElementById('shMarkerCount').innerText = validCoordsCount;
-              setTimeout(function() {
-                shMap.invalidateSize();
-                if (validCoordsCount === 1) shMap.setView([firstCoord.lat, firstCoord.lng], 14);
-                else shMap.fitBounds(shMarkersGroup.getBounds().pad(0.2));
-              }, 200);
-            } else { shMapBox.style.display = 'none'; }
-          } else {
-            sohoaResult.innerHTML = '<p style="color:red;">❌ Lỗi: ' + res.error + '</p>';
-            shMapBox.style.display = 'none';
+                marker.bindTooltip(labelText, { permanent: true, direction: 'right', className: 'map-label-tag' });
+
+                var popupContent = `<b>Tuyến:</b> ${item.info.tuyenCap} (${item.info.link})<br>` +
+                                   `<b>Đối tượng:</b> ${item.info.doiTuong} - ${item.info.taiKm}<br>` +
+                                   `<b>Trạm QL:</b> ${item.info.tramQL}<br>` +
+                                   `<b>Tọa độ:</b> ${item.info.toaDo}`;
+                marker.bindPopup(popupContent);
+                bounds.push([item.lat, item.lng]);
+              });
+
+              if (bounds.length > 0) {
+                mapInstanceSoHoa.invalidateSize();
+                mapInstanceSoHoa.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+              }
+            }, 300);
           }
-        })
-        .searchSoHoa(link, tuyenCap, keyword);
+        } else {
+          resultDiv.innerHTML = '<p style="color: red;">❌ Lỗi: ' + res.error + '</p>';
+        }
+      }).searchSoHoa(link, tuyenCap, keyword);
+    }
+
+    function renderVatTuTable(dataList) {
+      var resultDiv = document.getElementById('vatTuResult');
+      if (!dataList || dataList.length === 0) {
+        resultDiv.innerHTML = '<p style="color: red; font-weight: bold;">⚠️ Không tìm thấy vật tư phù hợp.</p>';
+        return;
+      }
+
+      var html = '<div class="table-responsive"><table><thead><tr>' +
+        '<th>Mã Kho</th><th>Tên Kho</th><th>Lô Hàng</th><th>Mã VT</th><th>Tên Vật Tư</th>' +
+        '<th>Tên Tắt</th><th>Part Number</th><th>Serial</th><th>Lĩnh Vực</th>' +
+        '</tr></thead><tbody>';
+
+      dataList.forEach(function(row) {
+        html += '<tr>' +
+          '<td>' + (row.maKho || '') + '</td>' +
+          '<td>' + (row.tenKho || '') + '</td>' +
+          '<td>' + (row.loHang || '') + '</td>' +
+          '<td>' + (row.maVt || '') + '</td>' +
+          '<td>' + (row.tenVt || '') + '</td>' +
+          '<td>' + (row.tenTat || '') + '</td>' +
+          '<td>' + (row.partNumber || '') + '</td>' +
+          '<td>' + (row.serial || '') + '</td>' +
+          '<td>' + (row.linhVuc || '') + '</td>' +
+          '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      resultDiv.innerHTML = html;
+    }
+
+    function filterVatTuByLinhVuc() {
+      doSearchVatTuLocal();
+    }
+
+    function doSearchVatTuLocal() {
+      var linhVucVal = document.getElementById('vtLinhVuc').value;
+      var keywordVal = document.getElementById('vtKeyword').value.toLowerCase().trim();
+
+      var filtered = globalVatTuData.filter(function(item) {
+        var matchLv = !linhVucVal || item.linhVuc === linhVucVal;
+        var matchKw = !keywordVal || (item.tenTat && item.tenTat.toLowerCase().includes(keywordVal)) || 
+                                     (item.tenVt && item.tenVt.toLowerCase().includes(keywordVal));
+        return matchLv && matchKw;
+      });
+
+      renderVatTuTable(filtered);
     }
   </script>
 </body>
